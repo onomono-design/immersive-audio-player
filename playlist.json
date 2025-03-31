@@ -1,0 +1,57 @@
+{
+  "name": "Demo XR Audio Playlist",
+  "description": "A collection of sample tracks for the XR Audio Player",
+  "tracks": [
+    {
+      "id": 1,
+      "title": "SoundHelix Demo Track",
+      "chapter": "Chapter 1: Open Skies",
+      "audioSrc": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      "videoSrc": "https://cdn.glitch.global/6cb26b61-85d5-4e11-8c27-4e6a20f40e0b/360video.mp4?v=1695175536251",
+      "albumArt": "https://upload.wikimedia.org/wikipedia/en/7/74/Radiohead.okcomputer.albumart.jpg",
+      "duration": 371,
+      "artist": "SoundHelix"
+    },
+    {
+      "id": 2,
+      "title": "SoundHelix Demo Track 2",
+      "chapter": "Chapter 2: Deep Forest",
+      "audioSrc": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+      "videoSrc": "https://cdn.glitch.global/6cb26b61-85d5-4e11-8c27-4e6a20f40e0b/360video.mp4?v=1695175536251",
+      "albumArt": "https://upload.wikimedia.org/wikipedia/en/thumb/3/3b/Dark_Side_of_the_Moon.png/220px-Dark_Side_of_the_Moon.png",
+      "duration": 323,
+      "artist": "SoundHelix"
+    },
+    {
+      "id": 3,
+      "title": "SoundHelix Demo Track 3",
+      "chapter": "Chapter 3: Mountain View",
+      "audioSrc": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+      "videoSrc": "https://cdn.glitch.global/6cb26b61-85d5-4e11-8c27-4e6a20f40e0b/360video.mp4?v=1695175536251",
+      "albumArt": "https://upload.wikimedia.org/wikipedia/en/thumb/d/d6/Pink_Floyd%2C_Wish_You_Were_Here_%281975%29.png/220px-Pink_Floyd%2C_Wish_You_Were_Here_%281975%29.png",
+      "duration": 289,
+      "artist": "SoundHelix"
+    },
+    {
+      "id": 4,
+      "title": "SoundHelix Demo Track 4",
+      "chapter": "Chapter 4: Ocean Depths",
+      "audioSrc": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+      "videoSrc": "https://cdn.glitch.global/6cb26b61-85d5-4e11-8c27-4e6a20f40e0b/360video.mp4?v=1695175536251",
+      "albumArt": "https://upload.wikimedia.org/wikipedia/en/9/9f/Nirvana-Nevermind.jpg",
+      "duration": 347,
+      "artist": "SoundHelix"
+    },
+    {
+      "id": 5,
+      "title": "SoundHelix Demo Track 5",
+      "chapter": "Chapter 5: Desert Sands",
+      "audioSrc": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+      "videoSrc": "https://cdn.glitch.global/6cb26b61-85d5-4e11-8c27-4e6a20f40e0b/360video.mp4?v=1695175536251",
+      "albumArt": "https://upload.wikimedia.org/wikipedia/en/3/3d/The_Beatles_1_album_cover.jpg",
+      "duration": 304,
+      "artist": "SoundHelix"
+    }
+  ],
+  "currentIndex": 0
+} 

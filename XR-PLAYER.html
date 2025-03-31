@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Immersive Audio Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+    <!-- External CSS -->
+    <link rel="stylesheet" href="player-layout.css">
+    <link rel="stylesheet" href="player-controls.css">
+    <!-- Inline CSS for components not in external files -->
+    <style>
+      /* Global styles to prevent scrolling */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: fixed;
+        touch-action: none;
+        -webkit-overflow-scrolling: none;
+      }
+      
+      /* Base container styles */
+      .immersive-track-container {
+        font-family: sans-serif;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: linear-gradient(135deg, #2c3e50, #4ca1af);
+        touch-action: none;
+      }
+
+      /* XR scene specific styles - Critical z-index adjustments */
+      .xr-scene {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 9000 !important; /* Super high z-index to ensure visibility */
+        pointer-events: auto;
+        background-color: transparent !important;
+        display: block !important;
+        opacity: 1 !important;
+      }
+      
+      /* When body has this class, ensure all A-Frame elements are completely hidden */
+      body.xr-scene-hidden .xr-scene,
+      body.xr-scene-hidden a-scene,
+      body.xr-scene-hidden .a-canvas {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+      
+      /* When body does NOT have this class, ensure XR elements can be visible */
+      body:not(.xr-scene-hidden) .xr-scene {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+      
+      body:not(.xr-scene-hidden) a-scene,
+      body:not(.xr-scene-hidden) .a-canvas {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+      
+      /* Hide A-Frame attribution and VR button */
+      .a-enter-ar, .a-enter-vr, .a-orientation-modal, .a-dialog-allow-button {
+        display: none !important;
+      }
+      
+      /* Ensure A-Frame canvas is visible and properly positioned */
+      .a-canvas {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important; 
+        height: 100% !important;
+        z-index: 9001 !important; /* Canvas needs highest z-index */
+        display: block !important;
+        background-color: transparent !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+      
+      /* Centered album art */
+      .centered-album-art {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: calc(100% - 40px); /* Fill available width with padding */
+        max-width: 100vh; /* Prevent extremely wide displays from stretching too much */
+        /* Height calculation ensures no overlap with controls */
+        height: min(calc(100vh - 200px), calc(100vw - 40px));
+        max-height: calc(100vh - 200px); /* Ensure it doesn't overlap with controls */
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        z-index: 2;
+      }
+      
+      .centered-album-art img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* Loading overlay */
+      .loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 10000; /* Super high z-index */
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .loading-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Player controls need to be above everything except the XR scene */
+      .audio-controls {
+        position: absolute;
+        z-index: 9500 !important;
+      }
+      
+      /* XR buttons need to be above everything except loading overlay */
+      .xr-buttons {
+        position: absolute;
+        z-index: 9900 !important;
+      }
+      
+      /* Debug info */
+      .debug-info {
+        position: fixed;
+        bottom: 15px;
+        left: 15px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 10500;
+        max-width: 300px;
+        word-break: break-all;
+      }
+      
+      /* Responsive adjustments */
+      @media (max-width: 480px) {
+        .centered-album-art {
+          width: calc(100% - 30px);
+          height: min(calc(100vh - 180px), calc(100vw - 30px));
+        }
+      }
+      
+      /* Landscape mode for mobile devices */
+      @media (max-height: 500px) and (orientation: landscape) {
+        .centered-album-art {
+          width: 70%;
+          height: calc(100vh - 150px);
+          max-height: 60vh;
+          top: calc(50% - 20px);
+        }
+      }
+      
+      /* Playlist Button in Controls */
+      .playlist-btn {
+        margin-right: 8px;
+      }
+      
+      .playlist-btn svg {
+        width: 24px;
+        height: 24px;
+      }
+      
+      /* Playlist Overlay Styles */
+      .playlist-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 9600;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .playlist-overlay.active {
+        display: flex;
+        opacity: 1;
+      }
+      
+      .playlist-container {
+        background-color: #2c3e50;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+      
+      .playlist-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        background-color: rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .playlist-header h3 {
+        color: white;
+        margin: 0;
+        font-size: 18px;
+      }
+      
+      .close-playlist-btn {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+      }
+      
+      .close-playlist-btn:hover {
+        opacity: 1;
+      }
+      
+      .playlist-tracks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        max-height: calc(80vh - 60px);
+      }
+      
+      .playlist-tracks li {
+        padding: 12px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        transition: background-color 0.2s ease;
+      }
+      
+      .playlist-tracks li:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      
+      .playlist-tracks li.active {
+        background-color: rgba(76, 161, 175, 0.3);
+      }
+      
+      .track-title {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      
+      .track-chapter {
+        font-size: 0.8em;
+        opacity: 0.7;
+      }
+      
+      /* Responsive adjustments for playlist */
+      @media (max-width: 480px) {
+        .playlist-container {
+          width: 95%;
+          max-height: 90vh;
+        }
+      }
+      
+      @media (max-height: 500px) and (orientation: landscape) {
+        .playlist-container {
+          max-height: 80vh;
+        }
+      }
+      
+      /* Prevent text selection during scrubbing */
+      body.scrubbing-in-progress {
+        user-select: none;
+        -webkit-user-select: none;
+        cursor: grabbing;
+      }
+      
+      /* Improve visual feedback when scrubbing */
+      .progress-bar.scrubbing .progress-filled {
+        background-color: #1ED760; /* Brighter green when active */
+        transition: none; /* Remove transition for immediate feedback */
+      }
+      
+      /* Make progress bar more responsive to hover */
+      .progress-bar:hover {
+        background-color: rgba(255, 255, 255, 0.3);
+      }
+      
+      /* Add a subtle transition for hover effects */
+      .progress-bar, .progress-filled, .progress-filled::after {
+        transition: all 0.15s ease;
+      }
+      
+      /* Recenter camera button styles */
+      #recenter-camera-btn {
+        transition: background-color 0.3s ease, transform 0.2s ease;
+      }
+      
+      #recenter-camera-btn:active {
+        transform: scale(0.95);
+      }
+      
+      #recenter-camera-btn.active {
+        background-color: #1DB954 !important;
+      }
+
+      /* XR button styles */
+      #launch-xr {
+        position: relative;
+        transition: all 0.3s ease;
+      }
+
+      #launch-xr:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: #888;
+      }
+      
+      #launch-xr:disabled::after {
+        content: '';
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-left: 8px;
+        border: 2px solid rgba(255,255,255,0.7);
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: xr-button-loading 1s linear infinite;
+        vertical-align: middle;
+      }
+      
+      @keyframes xr-button-loading {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="immersive-track-container" id="player-container">
+      <!-- Centered Album Art -->
+      <div class="centered-album-art">
+        <img id="album-art" alt="Album Art">
+      </div>
+
+      <!-- XR Scene Container - This needs to be above all other elements -->
+      <div id="xr-scene-container" class="xr-scene">
+        <a-scene
+          xr-mode-ui="enabled: false"
+          vr-mode-ui="enabled: false"
+          renderer="antialias: true; colorManagement: true; precision: high; logarithmicDepthBuffer: true;"
+          embedded
+          loading-screen="enabled: false"
+          inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js"
+        >
+          <a-assets timeout="30000">
+            <video id="xr-video" preload="auto" crossorigin="anonymous" playsinline loop muted></video>
+          </a-assets>
+          <a-videosphere src="#xr-video" rotation="0 -90 0" radius="100" segments-height="64" segments-width="64"></a-videosphere>
+          <a-entity camera position="0 1.6 0" look-controls="enabled: true; reverseMouseDrag: false" wasd-controls="enabled: false"></a-entity>
+        </a-scene>
+      </div>
+
+      <!-- Player Controls Section -->
+      <div class="audio-controls">
+        <div class="track-info">
+          <h4 id="track-name"></h4>
+          <p id="chapter-name"></p>
+          <div class="player-progress">
+            <div class="progress-bar">
+              <div class="progress-filled"></div>
+            </div>
+            <div class="time-display">
+              <span id="current-time">0:00</span>
+              <span id="duration">0:00</span>
+            </div>
+          </div>
+          <div class="playback-controls">
+            <button id="playlist-btn" class="control-btn playlist-btn" title="Show playlist">
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+              </svg>
+            </button>
+            <button id="rewind-btn" class="control-btn rewind-btn" title="Rewind 10 seconds">
+              <span class="time-shift-value">-10s</span>
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12.5,3C17.15,3 21.08,6.03 22.47,10.22L20.1,11C19.05,7.81 16.04,5.5 12.5,5.5C10.54,5.5 8.77,6.22 7.38,7.38L10,10H3V3L5.6,5.6C7.45,4 9.85,3 12.5,3M10,12V22H8V14H6V12H10M18,14V20C18,21.11 17.11,22 16,22H14A2,2 0 0,1 12,20V14A2,2 0 0,1 14,12H16C17.11,12 18,12.9 18,14M14,14V20H16V14H14Z"/>
+              </svg>
+            </button>
+            <button id="play-pause-btn" class="control-btn play-pause-btn">
+              <svg class="play-icon" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M8 5v14l11-7z"/>
+              </svg>
+              <svg class="pause-icon" viewBox="0 0 24 24" style="display: none;">
+                <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+              </svg>
+            </button>
+            <button id="forward-btn" class="control-btn forward-btn" title="Forward 10 seconds">
+              <span class="time-shift-value">+10s</span>
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M10,12V22H8V14H6V12H10M18,14V20C18,21.11 17.11,22 16,22H14A2,2 0 0,1 12,20V14A2,2 0 0,1 14,12H16C17.11,12 18,12.9 18,14M14,14V20H16V14H14M11.5,3C14.15,3 16.55,4 18.4,5.6L21,3V10H14L16.62,7.38C15.23,6.22 13.46,5.5 11.5,5.5C7.96,5.5 4.95,7.81 3.9,11L1.53,10.22C2.92,6.03 6.85,3 11.5,3Z"/>
+              </svg>
+            </button>
+            <button id="mute-btn" class="control-btn mute-btn" title="Toggle mute">
+              <svg class="volume-icon" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
+              </svg>
+              <svg class="mute-icon" viewBox="0 0 24 24" style="display: none;">
+                <path fill="currentColor" d="M12,4L9.91,6.09L12,8.18V4M4.27,3L3,4.27L7.73,9H3V15H7L12,20V13.27L16.25,17.53C15.58,18.04 14.83,18.46 14,18.7V20.77C15.38,20.45 16.63,19.82 17.68,18.96L19.73,21L21,19.73L12,10.73L4.27,3M19,12C19,12.94 18.8,13.82 18.46,14.64L19.97,16.15C20.62,14.91 21,13.5 21,12C21,7.72 18,4.14 14,3.23V5.29C16.89,6.15 19,8.83 19,12M16.5,12C16.5,10.23 15.5,8.71 14,7.97V10.18L16.45,12.63C16.5,12.43 16.5,12.21 16.5,12Z"/>
+              </svg>
+            </button>
+            <audio id="audio" preload="metadata">
+              <source id="audio-src" type="audio/mpeg">
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playlist Overlay -->
+      <div id="playlist-overlay" class="playlist-overlay">
+        <div class="playlist-container">
+          <div class="playlist-header">
+            <h3>Playlist</h3>
+            <button id="close-playlist-btn" class="close-playlist-btn">×</button>
+          </div>
+          <ul id="playlist-tracks" class="playlist-tracks">
+            <!-- Playlist items will be dynamically inserted here -->
+          </ul>
+        </div>
+      </div>
+
+      <div class="xr-buttons" id="xr-controls">
+        <button id="launch-xr" disabled>Loading XR Content...</button>
+        <button id="exit-xr" style="display: none;">Exit XR</button>
+        <button id="recenter-camera-btn" style="display: none;">Recenter Camera</button>
+      </div>
+
+      <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div>Loading immersive experience...</div>
+      </div>
+      
+      <!-- Debug info panel -->
+      <div class="debug-info" id="debug-info"></div>
+
+      <!-- External JS - Import in this order -->
+      <script src="shared-state.js"></script>
+      <script src="media-preloader.js"></script>
+      <script src="playlist-manager.js"></script>
+      <script src="player-core.js"></script>
+      <script src="player-controls.js"></script>
+      <script src="xr-mode.js"></script>
+
+      <!-- Initialize Player -->
+      <script>
+        document.addEventListener('DOMContentLoaded', () => {
+          // Set the initial state to hide XR scene
+          document.body.classList.add('xr-scene-hidden');
+          
+          // Disable all scrolling
+          document.body.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+          }, { passive: false });
+          
+          document.body.addEventListener('wheel', function(e) {
+            e.preventDefault();
+          }, { passive: false });
+          
+          // Enable debug mode for troubleshooting
+          const DEBUG = true;
+          const debugInfo = document.getElementById('debug-info');
+          
+          // Helper function to log debug info
+          function logDebug(message) {
+            if (!DEBUG) return;
+            console.log(message);
+            if (debugInfo) {
+              debugInfo.style.display = 'block';
+              debugInfo.innerHTML += message + '<br>';
+              // Keep only last 10 messages instead of 5 for more context
+              const lines = debugInfo.innerHTML.split('<br>');
+              if (lines.length > 11) {
+                debugInfo.innerHTML = lines.slice(lines.length - 11).join('<br>');
+              }
+            }
+          }
+          
+          // Check URL parameters for CMS data and auto-advance setting
+          function getUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoAdvance = urlParams.get('autoAdvance') !== 'false'; // Default to true
+            return { autoAdvance };
+          }
+          
+          // Get URL params and check if auto-advance is enabled
+          const { autoAdvance } = getUrlParams();
+          logDebug(`Auto-advance is ${autoAdvance ? 'enabled' : 'disabled'}`);
+          
+          // Populate initial track (this would normally come from playlist-manager.js)
+          const initialTrack = {
+            title: "SoundHelix Demo Track",
+            chapter: "Chapter 1: Open Skies",
+            audioSrc: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+            videoSrc: "https://cmm-cloud-storage.s3.us-east-2.amazonaws.com/2025-03-08-JAPANTOWN-XR1-LOW.mp4",
+            albumArt: "https://upload.wikimedia.org/wikipedia/en/7/74/Radiohead.okcomputer.albumart.jpg",
+            trackOrder: 1,
+            isXR: true // Set this property based on CMS data
+          };
+          
+          // Show loading indicator during preloading
+          const loadingOverlay = document.getElementById('loading-overlay');
+          if (loadingOverlay) {
+            loadingOverlay.classList.add('active');
+            
+            // Safety timeout to ensure loading overlay is always hidden eventually
+            const loadingTimeout = setTimeout(() => {
+              logDebug('Loading overlay safety timeout triggered');
+              loadingOverlay.classList.remove('active');
+              // Force with inline style as a backup
+              loadingOverlay.style.opacity = '0';
+              loadingOverlay.style.pointerEvents = 'none';
+              setTimeout(() => {
+                loadingOverlay.style.removeProperty('opacity');
+                loadingOverlay.style.removeProperty('pointer-events');
+              }, 1000);
+            }, 8000); // 8 second maximum loading time
+          }
+          
+          // Preload functions
+          const preloadXRContent = () => {
+            return new Promise((resolve, reject) => {
+              const video = document.querySelector('#xr-video');
+              const launchXrBtn = document.getElementById('launch-xr');
+              
+              // Ensure button is disabled while loading
+              if (launchXrBtn) {
+                launchXrBtn.disabled = true;
+                launchXrBtn.textContent = 'Loading XR Content...';
+              }
+              
+              if (!video) {
+                logDebug('Video element not found during preload');
+                reject(new Error('Video element not found'));
+                return;
+              }
+              
+              logDebug('Starting video preload: ' + initialTrack.videoSrc);
+              
+              // Listen for both canplaythrough and loadeddata events
+              let resolved = false;
+              const markAsResolved = () => {
+                if (!resolved) {
+                  resolved = true;
+                  logDebug('XR video preloaded successfully');
+                  // Store video buffered state
+                  if (typeof SharedState !== 'undefined') {
+                    SharedState.updateState({ videoBuffered: true });
+                  }
+                  
+                  // Enable the XR button
+                  if (launchXrBtn) {
+                    launchXrBtn.disabled = false;
+                    launchXrBtn.textContent = 'Launch XR Mode';
+                    logDebug('XR button enabled - video is ready');
+                  }
+                  
+                  resolve(video);
+                }
+              };
+              
+              // Setup error handler
+              const handleError = (e) => {
+                if (!resolved) {
+                  const errorMessage = video.error ? 
+                    `Video error code: ${video.error.code}, message: ${video.error.message}` : 
+                    'Unknown video error';
+                  logDebug('Error preloading XR video: ' + errorMessage);
+                  console.error('Error preloading XR video:', e);
+                  reject(new Error(errorMessage));
+                }
+              };
+              
+              // Clear any existing sources and listeners
+              video.removeAttribute('src');
+              video.load();
+              
+              // Set up multiple event listeners for different browser behaviors
+              video.addEventListener('canplaythrough', markAsResolved, { once: true });
+              video.addEventListener('loadeddata', () => {
+                logDebug('Video loadeddata event fired, readyState: ' + video.readyState);
+                // On some browsers, this might be enough
+                if (video.readyState >= 3) {
+                  markAsResolved();
+                }
+              }, { once: true });
+              
+              video.addEventListener('error', handleError, { once: true });
+              
+              // Set the source
+              video.crossOrigin = 'anonymous';
+              video.src = initialTrack.videoSrc;
+              video.muted = true; // Muted for autoplay capability
+              logDebug('Setting video source: ' + initialTrack.videoSrc);
+              
+              // Force load the video
+              video.load();
+              logDebug('Video load triggered');
+              
+              // Try preloading with play/pause, but handle autoplay restrictions gracefully
+              setTimeout(() => {
+                video.play().then(() => {
+                  // Immediately pause after playing to preload
+                  video.pause();
+                  video.currentTime = 0;
+                  logDebug('Video play/pause sequence completed for preloading');
+                }).catch(e => {
+                  logDebug('Auto-play for preloading not allowed: ' + e.message);
+                  console.warn('Auto-play for preloading not allowed:', e);
+                  // This is expected on some browsers, not a critical error
+                  // Check if we have enough data anyway
+                  if (video.readyState >= 3) {
+                    markAsResolved();
+                  } else {
+                    // Set a timeout to check video readiness in case events don't fire
+                    setTimeout(() => {
+                      if (!resolved && video.readyState >= 2) {
+                        logDebug('Video preloaded via timeout check (readyState: ' + video.readyState + ')');
+                        markAsResolved();
+                      }
+                    }, 3000);
+                  }
+                });
+              }, 500);
+              
+              // Set a timeout fallback
+              setTimeout(() => {
+                if (!resolved) {
+                  logDebug('Video preload timed out after 10 seconds, but continuing anyway');
+                  
+                  // Still enable the button even after timeout
+                  if (launchXrBtn && launchXrBtn.disabled) {
+                    launchXrBtn.disabled = false;
+                    launchXrBtn.textContent = 'Launch XR Mode';
+                    logDebug('XR button enabled after timeout');
+                  }
+                  
+                  markAsResolved();
+                }
+              }, 10000);
+            });
+          };
+          
+          // Call this function when entering XR mode to ensure A-Frame scene is visible and working
+          function ensureAFrameSceneVisibility() {
+            logDebug('Ensuring A-Frame scene visibility');
+            
+            const xrContainer = document.getElementById('xr-scene-container');
+            if (!xrContainer) {
+              logDebug('XR container not found');
+              return false;
+            }
+            
+            // Make sure A-Frame is loaded
+            if (!window.AFRAME) {
+              logDebug('A-Frame library not loaded');
+              alert('A-Frame library is not loaded. Please refresh the page.');
+              return false;
+            }
+            
+            try {
+              // First, remove hidden class from body
+              document.body.classList.remove('xr-scene-hidden');
+              logDebug('Removed xr-scene-hidden class from body');
+              
+              // Reset all styles to ensure visibility
+              xrContainer.style.cssText = `
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 9000 !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+              `;
+              logDebug('Applied critical style overrides to XR container');
+              
+              // Add fallback rendering attempt if videosphere isn't rendering correctly
+              const fallbackVideoSetup = () => {
+                logDebug('Attempting fallback video setup');
+                // Get the video element
+                const video = document.getElementById('xr-video');
+                const scene = xrContainer.querySelector('a-scene');
+                const videosphere = scene.querySelector('a-videosphere');
+                
+                if (video && videosphere) {
+                  // Update video properties
+                  video.crossOrigin = 'anonymous';
+                  
+                  // Reset the videosphere
+                  videosphere.removeAttribute('src');
+                  
+                  // Force a re-render by removing and reattaching
+                  const parent = videosphere.parentNode;
+                  const temp = videosphere;
+                  parent.removeChild(videosphere);
+                  
+                  // Add it back after a short delay
+                  setTimeout(() => {
+                    parent.appendChild(temp);
+                    temp.setAttribute('src', '#xr-video');
+                    logDebug('Videosphere reattached after full reset');
+                  }, 100);
+                }
+              };
+              
+              // Schedule a fallback attempt after a short delay
+              setTimeout(fallbackVideoSetup, 500);
+              
+              // Check if A-Frame scene exists
+              const scene = xrContainer.querySelector('a-scene');
+              if (!scene) {
+                logDebug('A-Frame scene not found');
+                return false;
+              }
+              
+              // Check if A-Frame is fully initialized
+              if (!scene.hasLoaded) {
+                logDebug('A-Frame scene not fully loaded yet, waiting...');
+                // Wait for A-Frame to fully initialize
+                return new Promise((resolve) => {
+                  scene.addEventListener('loaded', () => {
+                    logDebug('A-Frame scene loaded event fired');
+                    // Continue once loaded
+                    finishSceneSetup(scene);
+                    resolve(true);
+                  }, { once: true });
+                  
+                  // Set a timeout in case the event never fires
+                  setTimeout(() => {
+                    logDebug('A-Frame scene load timeout, continuing anyway');
+                    finishSceneSetup(scene);
+                    resolve(true);
+                  }, 3000);
+                });
+              } else {
+                // A-Frame is already initialized
+                return finishSceneSetup(scene);
+              }
+              
+              function finishSceneSetup(scene) {
+                // Force visibility of A-Frame scene
+                scene.style.cssText = `
+                  display: block !important;
+                  visibility: visible !important;
+                  opacity: 1 !important;
+                  width: 100% !important;
+                  height: 100% !important;
+                  z-index: 9001 !important;
+                `;
+                
+                // Log scene information for debugging
+                logDebug('Scene loaded state: ' + scene.hasLoaded);
+                logDebug('Scene is active: ' + scene.isPlaying);
+                
+                // Make sure canvas is visible
+                const canvas = scene.canvas;
+                if (canvas) {
+                  canvas.style.cssText = `
+                    display: block !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    z-index: 9901 !important;
+                    opacity: 1 !important;
+                    visibility: visible !important;
+                  `;
+                  logDebug('A-Frame canvas styles reset with !important flags');
+                  
+                  // Examine canvas properties
+                  logDebug('Canvas dimensions: ' + canvas.width + 'x' + canvas.height);
+                  logDebug('Canvas visibility: ' + canvas.style.visibility);
+                } else {
+                  logDebug('A-Frame canvas not found');
+                  return false;
+                }
+                
+                // Force scene to resize if renderer exists
+                if (scene.renderer) {
+                  scene.renderer.setSize(window.innerWidth, window.innerHeight);
+                  window.dispatchEvent(new Event('resize'));
+                  if (typeof scene.resize === 'function') {
+                    scene.resize();
+                  }
+                  logDebug('A-Frame renderer resized');
+                } else {
+                  logDebug('A-Frame renderer not available');
+                }
+                
+                // Check and enable camera look controls
+                const camera = scene.querySelector('[camera]');
+                if (camera) {
+                  camera.setAttribute('look-controls', 'enabled', true);
+                  logDebug('A-Frame camera controls enabled');
+                } else {
+                  logDebug('A-Frame camera not found');
+                  return false;
+                }
+                
+                // Make sure video is properly attached to videosphere
+                const videosphere = scene.querySelector('a-videosphere');
+                if (videosphere) {
+                  const video = document.querySelector('#xr-video');
+                  if (video) {
+                    // Force re-attach the video
+                    videosphere.removeAttribute('src');
+                    setTimeout(() => {
+                      videosphere.setAttribute('src', '#xr-video');
+                      logDebug('Reattached video to videosphere');
+                      
+                      // Check videosphere material
+                      const material = videosphere.getObject3D('mesh').material;
+                      if (material) {
+                        logDebug('Videosphere material exists');
+                        if (material.map) {
+                          logDebug('Videosphere has texture map');
+                        } else {
+                          logDebug('Videosphere missing texture map');
+                        }
+                      } else {
+                        logDebug('Videosphere missing material');
+                      }
+                    }, 100);
+                  }
+                } else {
+                  logDebug('A-Frame videosphere not found');
+                  return false;
+                }
+                
+                // Force redraw
+                setTimeout(() => {
+                  window.dispatchEvent(new Event('resize'));
+                  logDebug('Forced window resize event for A-Frame');
+                }, 50);
+                
+                return true;
+              }
+            } catch (e) {
+              logDebug('Error showing A-Frame scene: ' + e.message);
+              console.error('Error showing A-Frame scene:', e);
+              return false;
+            }
+          }
+          
+          // Initialize the player (this would be handled by player-core.js in the full version)
+          if (typeof PlayerCore !== 'undefined') {
+            // Preload the XR content before initializing
+            logDebug('Starting preload with PlayerCore available');
+            preloadXRContent()
+              .then(() => {
+                PlayerCore.init(initialTrack);
+                if (loadingOverlay) {
+                  loadingOverlay.classList.remove('active');
+                }
+                logDebug('PlayerCore initialized');
+                
+                // Initialize recenter camera functionality
+                if (typeof addRecenterCameraHandler === 'function') {
+                  setTimeout(addRecenterCameraHandler, 500);
+                  logDebug('Added recenter camera handler');
+                }
+              })
+              .catch(error => {
+                logDebug('Error during preload: ' + error.message);
+                console.error('Error during preload:', error);
+                if (loadingOverlay) {
+                  loadingOverlay.classList.remove('active');
+                }
+                PlayerCore.init(initialTrack); // Still initialize even if preload fails
+                
+                // Initialize recenter camera functionality even after error
+                if (typeof addRecenterCameraHandler === 'function') {
+                  setTimeout(addRecenterCameraHandler, 500);
+                  logDebug('Added recenter camera handler after preload error');
+                }
+              });
+          } else {
+            // Fallback for when external scripts aren't available
+            logDebug('PlayerCore not available, using fallback');
+            const video = document.querySelector('#xr-video');
+            const audio = document.querySelector('#audio');
+            const audioSrc = document.querySelector('#audio-src');
+            
+            // Set audio source
+            audioSrc.src = initialTrack.audioSrc;
+            audio.load();
+            logDebug('Audio source set: ' + initialTrack.audioSrc);
+            
+            // Preload the XR video
+            preloadXRContent()
+              .then(() => {
+                if (loadingOverlay) {
+                  loadingOverlay.classList.remove('active');
+                }
+                logDebug('XR content preloaded successfully');
+              })
+              .catch(error => {
+                logDebug('Error during manual preload: ' + error.message);
+                console.error('Error during manual preload:', error);
+                // Still set the video source as fallback
+                video.src = initialTrack.videoSrc;
+                video.load();
+                if (loadingOverlay) {
+                  loadingOverlay.classList.remove('active');
+                }
+              })
+              .finally(() => {
+                // Update UI regardless of preload success
+                document.querySelector('#track-name').textContent = initialTrack.title;
+                document.querySelector('#chapter-name').textContent = initialTrack.chapter;
+                document.querySelector('#album-art').src = initialTrack.albumArt;
+                
+                // Setup basic XR mode functionality if scripts are missing
+                setupBasicXRMode();
+                logDebug('Basic XR mode setup complete');
+              });
+              
+            // Setup basic XR mode functionality if scripts are missing
+            function setupBasicXRMode() {
+              const launchXrBtn = document.getElementById('launch-xr');
+              const exitXrBtn = document.getElementById('exit-xr');
+              const xrContainer = document.getElementById('xr-scene-container');
+              const albumArt = document.querySelector('.centered-album-art');
+              const controlsContainer = document.querySelector('.audio-controls');
+              const video = document.querySelector('#xr-video');
+              
+              // Initialize button state - disabled by default until video loads
+              if (launchXrBtn) {
+                launchXrBtn.disabled = true;
+                launchXrBtn.textContent = 'Loading XR Content...';
+              }
+              
+              if (launchXrBtn && exitXrBtn && xrContainer && albumArt) {
+                // Check video readiness and update button state
+                const updateButtonState = () => {
+                  if (video && video.readyState >= 3) { // HAVE_FUTURE_DATA = 3
+                    launchXrBtn.disabled = false;
+                    launchXrBtn.textContent = 'Launch XR Mode';
+                    logDebug('XR button enabled - video is ready (readyState: ' + video.readyState + ')');
+                  } else if (video) {
+                    launchXrBtn.disabled = true;
+                    launchXrBtn.textContent = 'Loading XR Content...';
+                    logDebug('XR button disabled - video not ready (readyState: ' + (video ? video.readyState : 'no video') + ')');
+                  }
+                };
+                
+                // Set up event listeners for video loading
+                if (video) {
+                  // Check if already loaded
+                  updateButtonState();
+                  
+                  // Listen for loading events
+                  video.addEventListener('canplaythrough', () => {
+                    logDebug('Video canplaythrough event fired');
+                    updateButtonState();
+                  }, { once: true });
+                  
+                  video.addEventListener('loadeddata', () => {
+                    logDebug('Video loadeddata event fired');
+                    updateButtonState();
+                  }, { once: true });
+                }
+                
+                launchXrBtn.addEventListener('click', async () => {
+                  // Skip if button is disabled
+                  if (launchXrBtn.disabled) {
+                    logDebug('Ignoring click on disabled XR button');
+                    return;
+                  }
+                  
+                  logDebug('Launch XR button clicked');
+                  document.body.style.overflow = 'hidden'; // Prevent scrolling
+                  
+                  // Show loading indicator if available
+                  if (loadingOverlay) {
+                    loadingOverlay.classList.add('active');
+                  }
+                  
+                  try {
+                    // Ensure A-Frame is properly initialized first
+                    if (typeof initializeAFrameScene === 'function') {
+                      logDebug('Ensuring A-Frame is initialized');
+                      initializeAFrameScene();
+                    }
+                    
+                    // Make sure video is properly loaded
+                    let videoReady = false;
+                    if (video.readyState >= 3) {
+                      videoReady = true;
+                    } else {
+                      // Try to load the video first
+                      logDebug('Video not ready, attempting to load');
+                      
+                      try {
+                        if (!video.src && initialTrack && initialTrack.videoSrc) {
+                          video.src = initialTrack.videoSrc;
+                        }
+                        
+                        if (!video.src) {
+                          throw new Error('No video source available');
+                        }
+                        
+                        // Wait for video to be ready
+                        await new Promise((resolve, reject) => {
+                          const videoLoadTimeout = setTimeout(() => {
+                            logDebug('Video load timed out, continuing anyway');
+                            resolve();
+                          }, 5000);
+                          
+                          video.addEventListener('canplaythrough', () => {
+                            clearTimeout(videoLoadTimeout);
+                            logDebug('Video canplaythrough event fired');
+                            videoReady = true;
+                            resolve();
+                          }, { once: true });
+                          
+                          video.addEventListener('error', (e) => {
+                            clearTimeout(videoLoadTimeout);
+                            logDebug('Video loading error: ' + (video.error ? video.error.message : 'unknown'));
+                            reject(new Error('Video loading failed'));
+                          }, { once: true });
+                          
+                          // Force video loading
+                          video.load();
+                        });
+                      } catch (videoError) {
+                        logDebug('Error loading video: ' + videoError.message);
+                        // Continue anyway - user experience is better than showing an error
+                      }
+                    }
+                    
+                    // First, remove hidden class from body
+                    document.body.classList.remove('xr-scene-hidden');
+                    logDebug('Removed xr-scene-hidden class from body');
+                    
+                    // Hide album art
+                    albumArt.style.display = 'none';
+                    
+                    // Explicitly make the scene container visible with !important styles inline
+                    xrContainer.style.cssText = `
+                      display: block !important;
+                      visibility: visible !important;
+                      opacity: 1 !important;
+                      z-index: 9000 !important;
+                      position: fixed !important;
+                      top: 0 !important;
+                      left: 0 !important;
+                      width: 100vw !important;
+                      height: 100vh !important;
+                    `;
+                    logDebug('Applied critical style overrides to XR container');
+                    
+                    // Make sure any internal A-Frame elements are visible
+                    const aframeElements = xrContainer.querySelectorAll('a-scene, .a-canvas');
+                    aframeElements.forEach(el => {
+                      el.style.cssText = `
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                      `;
+                    });
+                    logDebug('Applied critical style overrides to A-Frame elements');
+                    
+                    // Explicitly handle A-Frame scene
+                    const scene = xrContainer.querySelector('a-scene');
+                    if (scene) {
+                      // Force scene visibility
+                      scene.style.cssText = `
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        z-index: 9001 !important;
+                      `;
+                      
+                      // Make sure canvas is visible
+                      const canvas = scene.canvas;
+                      if (canvas) {
+                        canvas.style.cssText = `
+                          display: block !important;
+                          width: 100% !important;
+                          height: 100% !important;
+                          position: absolute !important;
+                          top: 0 !important;
+                          left: 0 !important;
+                          z-index: 9901 !important;
+                          opacity: 1 !important;
+                          visibility: visible !important;
+                        `;
+                      }
+                      
+                      // Force scene to resize if renderer exists
+                      if (scene.renderer) {
+                        scene.renderer.setSize(window.innerWidth, window.innerHeight);
+                      }
+                      
+                      // Check and enable camera look controls
+                      const camera = scene.querySelector('[camera]');
+                      if (camera) {
+                        camera.setAttribute('look-controls', 'enabled: true; reverseMouseDrag: false');
+                      }
+                      
+                      // Make sure video is properly attached to videosphere
+                      const videosphere = scene.querySelector('a-videosphere');
+                      if (videosphere && video) {
+                        // Force re-attach the video
+                        videosphere.removeAttribute('src');
+                        setTimeout(() => {
+                          videosphere.setAttribute('src', '#xr-video');
+                          logDebug('Reattached video to videosphere');
+                        }, 50);
+                      }
+                    }
+                    
+                    // Update button visibility - hide XR launch button and show exit button
+                    launchXrBtn.style.display = 'none';
+                    exitXrBtn.style.display = 'inline-block';
+                    
+                    // Show recenter camera button in XR mode
+                    const recenterBtn = document.getElementById('recenter-camera-btn');
+                    if (recenterBtn) {
+                      recenterBtn.style.display = 'inline-block';
+                      // Call recenter handler if it exists
+                      if (typeof addRecenterCameraHandler === 'function') {
+                        setTimeout(addRecenterCameraHandler, 100);
+                      }
+                    }
+                    
+                    // Implement master mute - mute audio and use video for sound
+                    const savedVolume = audio.volume;
+                    const wasMuted = audio.muted;
+                    
+                    // Store audio state for later
+                    audio.dataset.prevVolume = savedVolume;
+                    audio.dataset.prevMuted = wasMuted;
+                    
+                    // CRITICAL FIX: Always mute audio and unmute video in XR mode
+                    audio.muted = true;
+                    logDebug('Forced audio element to mute for XR mode');
+                    
+                    // Update mute button UI to show unmuted state in XR mode (since video will be unmuted)
+                    const muteBtn = document.getElementById('mute-btn');
+                    const volumeIcon = document.querySelector('.volume-icon');
+                    const muteIcon = document.querySelector('.mute-icon');
+                    
+                    if (muteBtn) {
+                      // Always show unmuted state when entering XR mode (since video is unmuted)
+                      muteBtn.classList.remove('muted');
+                      if (volumeIcon) volumeIcon.style.display = 'block';
+                      if (muteIcon) muteIcon.style.display = 'none';
+                      logDebug('Updated mute button UI to show unmuted state for XR mode');
+                    }
+                    
+                    // Force redraw page after short delay to ensure everything is rendered correctly
+                    setTimeout(() => {
+                      window.dispatchEvent(new Event('resize'));
+                      logDebug('Forced window resize event');
+                      
+                      // Final check of element visibility
+                      const computedStyle = window.getComputedStyle(xrContainer);
+                      logDebug('VISIBILITY CHECK: XR container display = ' + computedStyle.display);
+                      logDebug('VISIBILITY CHECK: XR container visibility = ' + computedStyle.visibility);
+                      logDebug('VISIBILITY CHECK: XR container opacity = ' + computedStyle.opacity);
+                      logDebug('VISIBILITY CHECK: XR container z-index = ' + computedStyle.zIndex);
+                      
+                      // If still not visible, try one more force
+                      if (computedStyle.display !== 'block' || computedStyle.visibility !== 'visible') {
+                        logDebug('CRITICAL: Forcing visibility one more time');
+                        xrContainer.style.cssText = `
+                          display: block !important;
+                          visibility: visible !important;
+                          opacity: 1 !important;
+                          z-index: 9000 !important;
+                          position: fixed !important;
+                          top: 0 !important;
+                          left: 0 !important;
+                          width: 100vw !important;
+                          height: 100vh !important;
+                        `;
+                        
+                        // Check if the scene has a canvas and ensure it's visible
+                        const scene = xrContainer.querySelector('a-scene');
+                        if (scene && scene.canvas) {
+                          scene.canvas.style.cssText = `
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1 !important;
+                            z-index: 9001 !important;
+                            position: absolute !important;
+                            width: 100% !important;
+                            height: 100% !important;
+                          `;
+                          logDebug('Applied emergency visibility fix to canvas');
+                        }
+                      }
+                    }, 100);
+                    
+                    // Ensure video is ready to play
+                    const video = document.querySelector('#xr-video');
+                    
+                    // Set video properties - CRITICAL FIX: Always ensure video is unmuted in XR mode
+                    video.volume = savedVolume;
+                    video.muted = false; // Force video to be unmuted in XR mode regardless of previous state
+                    video.currentTime = audio.currentTime || 0;
+                    logDebug('Set video properties: volume=' + video.volume + ', muted=' + video.muted + ', time=' + video.currentTime);
+                    
+                    // Start video playback
+                    try {
+                      await video.play();
+                      logDebug('Video playback started successfully');
+                      
+                      // Make sure to hide loading overlay
+                      if (loadingOverlay) {
+                        loadingOverlay.classList.remove('active');
+                        // Force with inline style as a backup
+                        loadingOverlay.style.opacity = '0';
+                        loadingOverlay.style.pointerEvents = 'none';
+                        setTimeout(() => {
+                          // Re-enable after delay to prevent getting stuck
+                          loadingOverlay.style.removeProperty('opacity');
+                          loadingOverlay.style.removeProperty('pointer-events');
+                        }, 1000);
+                      }
+                    } catch (e) {
+                      logDebug('Error starting video: ' + e.message);
+                      // Try again after user interaction
+                      alert('Please tap the screen to enable 360° video playback');
+                      
+                      // Make sure to hide loading overlay
+                      if (loadingOverlay) {
+                        loadingOverlay.classList.remove('active');
+                      }
+                      
+                      const resumeVideo = () => {
+                        video.play().catch(e => {
+                          logDebug('Still cannot play video: ' + e.message);
+                        });
+                        document.removeEventListener('click', resumeVideo);
+                      };
+                      document.addEventListener('click', resumeVideo, { once: true });
+                    }
+                    
+                    // Set up sync interval to keep video in sync with audio
+                    const syncInterval = setInterval(() => {
+                      if (Math.abs(video.currentTime - audio.currentTime) > 0.5) {
+                        video.currentTime = audio.currentTime;
+                        logDebug('Re-syncing video time with audio: ' + video.currentTime);
+                      }
+                    }, 5000);
+                    
+                    // Store for cleanup
+                    window._xrSyncInterval = syncInterval;
+                    
+                  } catch (e) {
+                    logDebug('Error entering XR mode: ' + e.message);
+                    console.error('Error entering XR mode:', e);
+                    
+                    // Reset UI in case of error
+                    albumArt.style.display = 'block';
+                    document.body.classList.add('xr-scene-hidden');
+                    
+                    // Show error to user
+                    alert('There was a problem entering XR mode: ' + e.message);
+                  } finally {
+                    // Hide loading indicator
+                    if (loadingOverlay) {
+                      loadingOverlay.classList.remove('active');
+                    }
+                  }
+                });
+                
+                exitXrBtn.addEventListener('click', () => {
+                  logDebug('Exit XR button clicked');
+                  
+                  // Clear sync interval if it exists
+                  if (window._xrSyncInterval) {
+                    clearInterval(window._xrSyncInterval);
+                    window._xrSyncInterval = null;
+                  }
+                  
+                  // Immediately add the hidden class to body
+                  document.body.classList.add('xr-scene-hidden');
+                  logDebug('Added xr-scene-hidden class to body');
+                  
+                  // Immediately hide the scene container first
+                  xrContainer.style.visibility = 'hidden';
+                  xrContainer.style.display = 'none';
+                  
+                  // Hide XR container with transition
+                  xrContainer.style.opacity = '0';
+                  
+                  // Explicitly hide all A-Frame components
+                  const scene = xrContainer.querySelector('a-scene');
+                  if (scene) {
+                    // Hide the scene itself
+                    scene.style.display = 'none';
+                    scene.style.visibility = 'hidden';
+                    
+                    // Hide the canvas
+                    if (scene.canvas) {
+                      scene.canvas.style.display = 'none';
+                      scene.canvas.style.visibility = 'hidden';
+                    }
+                    
+                    const videosphere = scene.querySelector('a-videosphere');
+                    if (videosphere) {
+                      // Remove source to free up resources
+                      videosphere.removeAttribute('src');
+                      logDebug('Removed video source from videosphere');
+                    }
+                  }
+                  
+                  // Restore audio state when returning to audio-only mode
+                  const video = document.querySelector('#xr-video');
+                  if (video) {
+                    // Get volume from previous state
+                    if (audio.dataset.prevVolume) {
+                      audio.volume = parseFloat(audio.dataset.prevVolume);
+                    }
+                    
+                    // CRITICAL FIX: Always unmute audio when returning to audio-only mode
+                    audio.muted = false;
+                    logDebug('Restored audio state with forced unmute: volume=' + audio.volume + ', muted=' + audio.muted);
+                    
+                    // Update mute button UI to show unmuted state
+                    const muteBtn = document.getElementById('mute-btn');
+                    const volumeIcon = document.querySelector('.volume-icon');
+                    const muteIcon = document.querySelector('.mute-icon');
+                    
+                    if (muteBtn) {
+                      // Always show unmuted state when returning to audio mode
+                      muteBtn.classList.remove('muted');
+                      if (volumeIcon) volumeIcon.style.display = 'block';
+                      if (muteIcon) muteIcon.style.display = 'none';
+                    }
+                    
+                    // Mute and stop video
+                    video.muted = true;
+                    if (!video.paused) {
+                      video.pause();
+                      logDebug('Video paused on XR exit');
+                    }
+                    
+                    // Remove video source to ensure it's fully unloaded
+                    const videoSrc = video.src;
+                    video.removeAttribute('src');
+                    video.load();
+                    logDebug('Video source removed to free up resources');
+                    
+                    // Store the source for later if needed
+                    video.dataset.lastSrc = videoSrc;
+                  }
+                  
+                  // Show album art again with fade-in
+                  albumArt.style.opacity = '0';
+                  albumArt.style.display = 'block';
+                  setTimeout(() => {
+                    albumArt.style.opacity = '1';
+                    albumArt.style.transition = 'opacity 0.3s ease';
+                  }, 50);
+                  
+                  // Also ensure any XR-specific UI elements are hidden
+                  const recenterBtn = document.getElementById('recenter-camera-btn');
+                  if (recenterBtn) {
+                    recenterBtn.style.display = 'none';
+                  }
+                  
+                  // Update button visibility - show XR launch button and hide exit button
+                  launchXrBtn.style.display = 'inline-block';
+                  exitXrBtn.style.display = 'none';
+                  
+                  // Force redraw the page to ensure everything is properly rendered
+                  window.dispatchEvent(new Event('resize'));
+                  logDebug('Audio-only view restored');
+                });
+                
+                // Setup playback controls sync for XR mode
+                if (controlsContainer) {
+                  const playPauseBtn = document.getElementById('play-pause-btn');
+                  if (playPauseBtn) {
+                    playPauseBtn.addEventListener('click', () => {
+                      const video = document.querySelector('#xr-video');
+                      // Audio control happens elsewhere, just sync video
+                      if (exitXrBtn.style.display !== 'none') { // XR mode is active
+                        if (audio.paused && !video.paused) {
+                          video.pause();
+                          logDebug('Video paused via play/pause button');
+                        } else if (!audio.paused && video.paused) {
+                          video.play().catch(e => {
+                            logDebug('Cannot play video via button: ' + e.message);
+                          });
+                        }
+                      }
+                    });
+                  }
+                  
+                  // Add dedicated mute button handler for XR mode
+                  const muteBtn = document.getElementById('mute-btn');
+                  if (muteBtn) {
+                    muteBtn.addEventListener('click', () => {
+                      const video = document.querySelector('#xr-video');
+                      if (exitXrBtn.style.display !== 'none') { // XR mode is active
+                        // Toggle video mute state in XR mode, keep audio muted
+                        video.muted = !video.muted;
+                        audio.muted = true; // Ensure audio remains muted in XR mode
+                        
+                        // Update UI
+                        const volumeIcon = document.querySelector('.volume-icon');
+                        const muteIcon = document.querySelector('.mute-icon');
+                        
+                        if (video.muted) {
+                          muteBtn.classList.add('muted');
+                          volumeIcon.style.display = 'none';
+                          muteIcon.style.display = 'block';
+                        } else {
+                          muteBtn.classList.remove('muted');
+                          volumeIcon.style.display = 'block';
+                          muteIcon.style.display = 'none';
+                        }
+                        
+                        logDebug('Video mute toggled in XR mode: ' + video.muted);
+                      } else { // Audio-only mode
+                        // Toggle audio mute state in audio-only mode, keep video muted
+                        audio.muted = !audio.muted;
+                        video.muted = true; // Ensure video remains muted in audio-only mode
+                        
+                        // Update UI
+                        const volumeIcon = document.querySelector('.volume-icon');
+                        const muteIcon = document.querySelector('.mute-icon');
+                        
+                        if (audio.muted) {
+                          muteBtn.classList.add('muted');
+                          volumeIcon.style.display = 'none';
+                          muteIcon.style.display = 'block';
+                        } else {
+                          muteBtn.classList.remove('muted');
+                          volumeIcon.style.display = 'block';
+                          muteIcon.style.display = 'none';
+                        }
+                        
+                        logDebug('Audio mute toggled in audio-only mode: ' + audio.muted);
+                      }
+                    });
+                  }
+                }
+                
+                // Start video preload feedback (this is now handled by the updateButtonState function above)
+                updateButtonState();
+                
+                // Set a timeout to check video state periodically in case events don't fire
+                const checkInterval = setInterval(() => {
+                  if (video && video.readyState >= 3) {
+                    updateButtonState();
+                    clearInterval(checkInterval);
+                  }
+                }, 1000);
+                
+                // Safety timeout to clear the interval
+                setTimeout(() => {
+                  clearInterval(checkInterval);
+                  // Force enable button after timeout even if video not fully loaded
+                  if (launchXrBtn.disabled) {
+                    launchXrBtn.disabled = false;
+                    launchXrBtn.textContent = 'Launch XR Mode';
+                    logDebug('XR button enabled by safety timeout');
+                  }
+                }, 15000);
+              } else {
+                logDebug('Missing required DOM elements for XR mode');
+              }
+            }
+            
+            // Alert user that external scripts are missing
+            console.warn('External player scripts not found. Using basic functionality.');
+          }
+        });
+      </script>
+    </div>
+    
+    <!-- Webflow CMS Integration Script -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Wait for Webflow to initialize
+        if (window.Webflow && window.Webflow.push) {
+          window.Webflow.push(function() {
+            // Get current item data from Webflow
+            const currentItem = Webflow.data.item;
+            
+            // Exit if no current item found
+            if (!currentItem) {
+              console.log('No Webflow CMS item data found, using default track');
+              return;
+            }
+            
+            console.log('Current CMS item:', currentItem);
+            
+            // Create track object from current item
+            const currentTrack = {
+              id: currentItem.id || currentItem._id,
+              title: currentItem.name || 'Unknown Track',
+              chapter: currentItem.chapterTitle || '',
+              audioSrc: currentItem.audioSrc || currentItem.audio_src || '',
+              videoSrc: currentItem.videoSrc || currentItem.XR_src || '',
+              albumArt: currentItem.albumArt || '',
+              trackOrder: currentItem.trackOrder || 0,
+              isXR: !!currentItem.isXR // Convert to boolean value
+            };
+            
+            // Load current track
+            if (typeof PlayerCore !== 'undefined') {
+              PlayerCore.loadTrack(currentTrack);
+              console.log('Loaded current track:', currentTrack);
+            }
+            
+            // Now fetch all tracks from the same collection for the playlist
+            fetchAllCollectionItems(currentItem.collection_id, currentTrack.id);
+          });
+        }
+        
+        // Function to fetch all items from the same collection
+        function fetchAllCollectionItems(collectionId, currentItemId) {
+          // Check if we're on a Webflow site with collection APIs
+          if (!collectionId || typeof Webflow === 'undefined') {
+            console.error('Cannot fetch collection items - missing collection ID or Webflow API');
+            return;
+          }
+          
+          // Construct API URL for the collection
+          const apiUrl = `/api/collections/${collectionId}/items?limit=100`;
+          
+          // Fetch all items
+          fetch(apiUrl)
+            .then(response => {
+              if (!response.ok) throw new Error('Failed to fetch collection items');
+              return response.json();
+            })
+            .then(data => {
+              if (!data.items || !Array.isArray(data.items)) {
+                throw new Error('Invalid collection items data');
+              }
+              
+              // Transform items into playlist tracks
+              const tracks = data.items.map(item => ({
+                id: item.id || item._id,
+                title: item.name || 'Unknown Track',
+                chapter: item.chapterTitle || '',
+                audioSrc: item.audioSrc || item.audio_src || '',
+                videoSrc: item.videoSrc || item.XR_src || '',
+                albumArt: item.albumArt || '',
+                trackOrder: item.trackOrder || 0,
+                isXR: !!item.isXR, // Convert to boolean value
+                // Store URL to this item's page for playlist navigation
+                itemUrl: item.slug ? `/${item.slug}` : null
+              }));
+              
+              // Sort tracks by trackOrder if available
+              tracks.sort((a, b) => {
+                if (a.trackOrder && b.trackOrder) {
+                  return a.trackOrder - b.trackOrder;
+                }
+                return 0; // Keep original order if no trackOrder
+              });
+              
+              // Find index of current track
+              const currentIndex = tracks.findIndex(track => track.id === currentItemId);
+              
+              // Create playlist object
+              const playlist = {
+                name: "Audio Experience",
+                tracks: tracks,
+                currentIndex: currentIndex >= 0 ? currentIndex : 0
+              };
+              
+              console.log('Created playlist with', tracks.length, 'tracks');
+              
+              // Initialize the playlist
+              if (typeof PlaylistManager !== 'undefined') {
+                PlaylistManager.init(playlist);
+                
+                // Set custom navigation to use item URLs
+                PlaylistManager.setPreviousCallback(() => {
+                  const prevIndex = currentIndex - 1;
+                  if (prevIndex >= 0 && tracks[prevIndex] && tracks[prevIndex].itemUrl) {
+                    window.location.href = tracks[prevIndex].itemUrl;
+                  }
+                });
+                
+                PlaylistManager.setNextCallback(() => {
+                  const nextIndex = currentIndex + 1;
+                  if (nextIndex < tracks.length && tracks[nextIndex] && tracks[nextIndex].itemUrl) {
+                    window.location.href = tracks[nextIndex].itemUrl;
+                  }
+                });
+                
+                // Populate playlist UI
+                populatePlaylistUI(tracks, currentItemId);
+              }
+            })
+            .catch(error => {
+              console.error('Error fetching collection items:', error);
+            });
+        }
+        
+        // Function to populate the playlist UI
+        function populatePlaylistUI(tracks, currentItemId) {
+          const playlistContainer = document.getElementById('playlist-tracks');
+          if (!playlistContainer) return;
+          
+          // Clear existing items
+          playlistContainer.innerHTML = '';
+          
+          // Add tracks to playlist UI
+          tracks.forEach((track, index) => {
+            const li = document.createElement('li');
+            if (track.id === currentItemId) {
+              li.classList.add('active');
+            }
+            
+            li.innerHTML = `
+              <div class="track-title">${track.trackOrder ? `${track.trackOrder}. ` : ''}${track.title}</div>
+              <div class="track-chapter">${track.chapter}</div>
+            `;
+            
+            // Add click handler to navigate to track
+            li.addEventListener('click', () => {
+              // Exit XR mode before navigating to new track
+              if (typeof XRController !== 'undefined' && XRController.isInXRMode()) {
+                console.log('Exiting XR mode before navigating to selected track');
+                XRController.exitXRMode();
+              }
+              
+              if (track.itemUrl) {
+                window.location.href = track.itemUrl;
+              }
+            });
+            
+            playlistContainer.appendChild(li);
+          });
+        }
+      });
+    </script>
+
+    <!-- Add helper function for recenter camera -->
+    <script>
+      // Add recenter camera functionality that will be available globally
+      function addRecenterCameraHandler() {
+        const recenterBtn = document.getElementById('recenter-camera-btn');
+        if (!recenterBtn) return;
+        
+        // Clear any existing event listeners
+        const newButton = recenterBtn.cloneNode(true);
+        recenterBtn.parentNode.replaceChild(newButton, recenterBtn);
+        
+        // Add event listener to the new button
+        newButton.addEventListener('click', function() {
+          console.log('Recenter camera button clicked');
+          
+          // First try to use the global recenterCamera function if available
+          if (typeof recenterCamera === 'function') {
+            recenterCamera();
+            // Flash feedback to user
+            this.classList.add('active');
+            setTimeout(() => {
+              this.classList.remove('active');
+            }, 300);
+            return;
+          }
+          
+          // Fallback to direct camera manipulation if global function not available
+          const scene = document.querySelector('a-scene');
+          if (!scene) {
+            console.log('Scene not found for recenter');
+            return;
+          }
+          
+          const camera = scene.querySelector('[camera]');
+          if (!camera) {
+            console.log('Camera not found for recenter');
+            return;
+          }
+          
+          // Reset camera rotation
+          camera.setAttribute('rotation', '0 0 0');
+          
+          // Flash feedback to user
+          this.classList.add('active');
+          setTimeout(() => {
+            this.classList.remove('active');
+          }, 300);
+          
+          // If using look-controls, also reset their state
+          if (camera.components && camera.components['look-controls']) {
+            const lookControls = camera.components['look-controls'];
+            if (lookControls) {
+              try {
+                // Reset rotation objects manually
+                if (lookControls.pitchObject) lookControls.pitchObject.rotation.x = 0;
+                if (lookControls.yawObject) lookControls.yawObject.rotation.y = 0;
+                console.log('Camera look controls reset');
+              } catch (e) {
+                console.error('Error resetting camera look controls:', e);
+              }
+            }
+          }
+          
+          console.log('Camera reset completed');
+        });
+        
+        console.log('Recenter camera handler added');
+      }
+      
+      // Ensure A-Frame scene is properly initialized
+      function initializeAFrameScene() {
+        console.log('Initializing A-Frame scene');
+        const xrContainer = document.getElementById('xr-scene-container');
+        if (!xrContainer) return false;
+        
+        const scene = xrContainer.querySelector('a-scene');
+        if (!scene) return false;
+        
+        // Force scene to be hidden but initialized
+        document.body.classList.add('xr-scene-hidden');
+        
+        // Handle scene loaded event
+        const isLoaded = scene.hasLoaded;
+        if (!isLoaded) {
+          scene.addEventListener('loaded', function() {
+            console.log('A-Frame scene loaded event fired');
+            finishSceneSetup(scene);
+          });
+        } else {
+          finishSceneSetup(scene);
+        }
+        
+        function finishSceneSetup(scene) {
+          // Initialize video element
+          const video = document.getElementById('xr-video');
+          if (video) {
+            video.setAttribute('crossorigin', 'anonymous');
+            video.crossOrigin = 'anonymous';
+          }
+          
+          // Ensure camera has look-controls
+          const camera = scene.querySelector('[camera]');
+          if (camera) {
+            camera.setAttribute('look-controls', 'enabled: true; reverseMouseDrag: false');
+          }
+          
+          // Add camera reset handler
+          addRecenterCameraHandler();
+          
+          console.log('A-Frame scene initialization complete');
+          return true;
+        }
+        
+        return true;
+      }
+      
+      // Call this function after DOM is loaded and again when entering XR mode
+      document.addEventListener('DOMContentLoaded', function() {
+        // Initialize A-Frame scene first
+        setTimeout(initializeAFrameScene, 300);
+        
+        // Then add recenter handler
+        setTimeout(addRecenterCameraHandler, 800);
+      });
+    </script>
+
+    <!-- Failsafe mechanism to ensure critical functions are available -->
+    <script>
+      // Add a window load event that checks and reinstates any missing functionality
+      window.addEventListener('load', function() {
+        // Check XR button state
+        const launchXrBtn = document.getElementById('launch-xr');
+        const video = document.getElementById('xr-video');
+        
+        if (launchXrBtn && video) {
+          // Ensure button state is correct based on video readiness
+          if (video.readyState >= 3) {
+            launchXrBtn.disabled = false;
+            launchXrBtn.textContent = 'Launch XR Mode';
+            console.log('XR button enabled by window load handler');
+          }
+          
+          // Add a click listener to the document to handle user interaction
+          // requirements for video loading in some browsers
+          document.addEventListener('click', function() {
+            // After user interaction, try to preload video again if needed
+            if (launchXrBtn.disabled && video.readyState < 3) {
+              console.log('User interaction detected, trying to load video');
+              video.load();
+              setTimeout(() => {
+                if (video.readyState >= 3) {
+                  launchXrBtn.disabled = false;
+                  launchXrBtn.textContent = 'Launch XR Mode';
+                  console.log('XR button enabled after user interaction');
+                }
+              }, 1000);
+            }
+          }, { once: true });
+          
+          // Safety timeout to ensure button becomes enabled eventually
+          setTimeout(() => {
+            if (launchXrBtn.disabled) {
+              launchXrBtn.disabled = false;
+              launchXrBtn.textContent = 'Launch XR Mode';
+              console.log('XR button enabled by failsafe timeout');
+            }
+          }, 20000);
+        }
+        
+        // Check if recenterCamera function exists, if not, create it
+        if (typeof recenterCamera !== 'function') {
+          console.log('Adding failsafe recenterCamera function');
+          
+          window.recenterCamera = function() {
+            console.log('Failsafe recenter camera function called');
+            
+            try {
+              // Get the A-Frame scene and camera
+              const scene = document.querySelector('a-scene');
+              if (!scene) return false;
+              
+              const camera = scene.querySelector('[camera]');
+              if (!camera) return false;
+              
+              // Reset camera rotation
+              camera.setAttribute('rotation', '0 0 0');
+              
+              // Try to reset look-controls
+              if (camera.components && camera.components['look-controls']) {
+                const lookControls = camera.components['look-controls'];
+                if (lookControls) {
+                  if (lookControls.pitchObject) lookControls.pitchObject.rotation.x = 0;
+                  if (lookControls.yawObject) lookControls.yawObject.rotation.y = 0;
+                }
+              }
+              
+              return true;
+            } catch (e) {
+              console.error('Error in failsafe recenterCamera:', e);
+              return false;
+            }
+          };
+        }
+        
+        // Check if the recenter button has event listeners, if not add them
+        const recenterBtn = document.getElementById('recenter-camera-btn');
+        if (recenterBtn) {
+          // Force add event listener that uses our global function
+          recenterBtn.addEventListener('click', function() {
+            console.log('Failsafe recenter button clicked');
+            
+            // Use the global recenterCamera function
+            if (typeof recenterCamera === 'function') {
+              recenterCamera();
+            }
+            
+            // Visual feedback
+            this.classList.add('active');
+            setTimeout(() => {
+              this.classList.remove('active');
+            }, 300);
+          });
+        }
+        
+        // Enable A-Frame scene camera look controls if needed
+        setTimeout(function() {
+          const scene = document.querySelector('a-scene');
+          if (scene) {
+            const camera = scene.querySelector('[camera]');
+            if (camera) {
+              camera.setAttribute('look-controls', 'enabled: true; reverseMouseDrag: false');
+              console.log('Failsafe camera look-controls enabled');
+            }
+          }
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>

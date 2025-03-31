@@ -1,0 +1,466 @@
+/* Player Controls CSS */
+
+.audio-controls {
+  position: absolute;
+  bottom: 40px;
+  left: 40px;
+  right: 40px;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  color: white;
+  max-width: 750px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.audio-controls .track-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.audio-controls h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio-controls p {
+  margin: 4px 0 12px;
+  font-size: 0.85rem;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hide native audio controls */
+.audio-controls audio {
+  display: none;
+}
+
+/* Custom progress bar */
+.player-progress {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.progress-bar {
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  position: relative;
+  cursor: pointer;
+  margin-bottom: 5px;
+  touch-action: none; /* Prevent browser handling of touch gestures */
+}
+
+/* Creating a larger invisible touch target without changing visual appearance */
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  cursor: pointer;
+}
+
+.progress-filled {
+  background-color: #1DB954;
+  height: 100%;
+  border-radius: 4px;
+  width: 0%;
+  position: relative;
+  transition: width 0.1s ease-in-out;
+}
+
+.progress-filled::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Always show the handle on mobile */
+@media (max-width: 768px) {
+  .progress-filled::after {
+    opacity: 1;
+  }
+  
+  .progress-bar {
+    height: 10px; /* Slightly larger for better touch targets */
+  }
+}
+
+.progress-bar:hover .progress-filled::after,
+.progress-bar:active .progress-filled::after {
+  opacity: 1;
+}
+
+/* Show larger touch target when dragging on any device */
+.progress-bar.scrubbing .progress-filled::after {
+  opacity: 1;
+  width: 24px;
+  height: 24px;
+  top: -7px;
+  right: -12px;
+  background-color: #1DB954;
+  border: 2px solid white;
+  /* Add transform for better visibility */
+  transform: scale(1.1);
+  transition: all 0.1s ease;
+}
+
+/* Add visual feedback during dragging */
+.progress-bar.scrubbing {
+  height: 12px;
+}
+
+.time-display {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+/* Playback controls */
+.playback-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.control-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+  touch-action: manipulation;
+}
+
+.control-btn:hover {
+  transform: scale(1.1);
+}
+
+.control-btn:active {
+  transform: scale(0.95);
+}
+
+.control-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.rewind-btn svg, .forward-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.play-pause-btn {
+  margin: 0 5px;
+}
+
+.play-pause-btn svg {
+  width: 28px;
+  height: 28px;
+}
+
+.mute-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mute-btn.muted {
+  color: #ff5252;
+}
+
+.rewind-btn.active, .forward-btn.active {
+  color: #1DB954;
+  animation: pulse 0.3s ease;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.time-shift-value {
+  position: absolute;
+  font-size: 10px;
+  color: #aaa;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.rewind-btn:hover .time-shift-value, 
+.forward-btn:hover .time-shift-value {
+  opacity: 1;
+}
+
+/* XR Controls */
+.xr-buttons {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
+.xr-buttons button {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 15px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.xr-buttons button:hover {
+  background: rgba(29, 185, 84, 0.8);
+  border-color: rgba(29, 185, 84, 0.6);
+}
+
+/* Centered album art responsive adjustments */
+.centered-album-art {
+  transform: translate(-50%, calc(-50% - 60px)) !important; /* Adjust position to create space for controls */
+}
+
+/* Mobile optimization - Extra small devices */
+@media (max-width: 480px) {
+  .audio-controls {
+    left: 10px;
+    bottom: 10px;
+    right: 10px;
+    max-width: none;
+    padding: 12px 10px;
+    border-radius: 12px;
+  }
+  
+  .centered-album-art {
+    width: 80vw !important;
+    height: 80vw !important;
+    max-width: 300px !important;
+    max-height: 300px !important;
+    transform: translate(-50%, calc(-50% - 40px)) !important;
+  }
+  
+  .track-info {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .audio-controls h4 {
+    font-size: 0.9rem;
+  }
+  
+  .audio-controls p {
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+  }
+  
+  .playback-controls {
+    margin-top: 8px;
+    gap: 10px;
+  }
+  
+  .control-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .play-pause-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .progress-bar {
+    height: 12px; /* Even larger on small screens */
+  }
+  
+  .progress-filled::after {
+    width: 20px;
+    height: 20px;
+    top: -5px;
+    right: -10px;
+  }
+  
+  .progress-bar.scrubbing .progress-filled::after {
+    width: 28px;
+    height: 28px;
+    top: -9px;
+    right: -14px;
+  }
+  
+  /* Increase spacing for time display */
+  .time-display {
+    margin-top: 8px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Mobile optimization - Small to medium devices */
+@media (min-width: 481px) and (max-width: 768px) {
+  .audio-controls {
+    left: 20px;
+    bottom: 20px;
+    right: 20px;
+    max-width: none;
+    padding: 12px;
+  }
+  
+  .centered-album-art {
+    width: 70vw !important;
+    height: 70vw !important;
+    max-width: 350px !important;
+    max-height: 350px !important;
+    transform: translate(-50%, calc(-50% - 40px)) !important;
+  }
+  
+  .track-info {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .playback-controls {
+    margin-top: 8px;
+    width: 100%;
+    justify-content: center;
+    gap: 12px;
+  }
+}
+
+/* Desktop optimization */
+@media (min-width: 769px) {
+  .audio-controls {
+    max-width: 750px;
+    margin: 0 auto;
+  }
+  
+  .track-info {
+    text-align: left;
+  }
+}
+
+/* Landscape mode for mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .audio-controls {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    padding: 10px;
+    align-items: center;
+    flex-direction: row;
+  }
+  
+  .centered-album-art {
+    width: 40vh !important;
+    height: 40vh !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: 180px !important;
+    max-height: 180px !important;
+    position: absolute;
+    left: 80px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+  }
+  
+  .track-info {
+    margin-left: 20%;
+  }
+  
+  .playback-controls {
+    flex-direction: row;
+    gap: 12px;
+  }
+  
+  .audio-controls h4 {
+    font-size: 0.9rem;
+  }
+  
+  .audio-controls p {
+    font-size: 0.75rem;
+    margin-bottom: 6px;
+  }
+}
+
+/* Support for notched devices */
+@supports (padding: max(0px)) {
+  .audio-controls {
+    bottom: max(40px, env(safe-area-inset-bottom) + 20px);
+    left: max(40px, env(safe-area-inset-left) + 10px);
+    right: max(40px, env(safe-area-inset-right) + 10px);
+  }
+  
+  @media (max-width: 768px) {
+    .audio-controls {
+      bottom: max(20px, env(safe-area-inset-bottom) + 10px);
+      left: max(20px, env(safe-area-inset-left) + 5px);
+      right: max(20px, env(safe-area-inset-right) + 5px);
+    }
+  }
+}
+
+/* Tablets and medium-sized screens */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .audio-controls {
+    max-width: 750px;
+    padding: 18px;
+  }
+}
+
+/* Large screens */
+@media (min-width: 1025px) {
+  .audio-controls {
+    max-width: 750px;
+    padding: 20px;
+  }
+  
+  .audio-controls h4 {
+    font-size: 1.1rem;
+  }
+  
+  .audio-controls p {
+    font-size: 0.9rem;
+  }
+  
+  .control-btn svg {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .play-pause-btn svg {
+    width: 32px;
+    height: 32px;
+  }
+} 
