@@ -18,7 +18,7 @@ An immersive audio player with XR mode support and automatic track navigation. T
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/immersive-audio-player.git
+git clone https://github.com/onomono-design/immersive-audio-player.git
 ```
 
 2. Open the XR-PLAYER.html file in a web browser, or host the files on a web server.
