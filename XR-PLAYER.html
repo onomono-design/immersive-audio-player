@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Immersive Audio Player</title>
+    <!-- Added mobile-web-app-capable and apple-mobile-web-app-capable for fullscreen experience -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
     <!-- External CSS -->
     <link rel="stylesheet" href="player-layout.css">
@@ -181,6 +186,68 @@
         z-index: 10500;
         max-width: 300px;
         word-break: break-all;
+      }
+      
+      /* Custom permission overlay for iOS */
+      .permission-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.9);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 20000;
+        padding: 20px;
+        text-align: center;
+      }
+      
+      .permission-overlay.active {
+        display: flex;
+      }
+      
+      .permission-icon {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 20px;
+        animation: pulse 1.5s infinite;
+      }
+      
+      .permission-title {
+        font-size: 20px;
+        margin-bottom: 15px;
+        font-weight: bold;
+      }
+      
+      .permission-message {
+        margin-bottom: 25px;
+        max-width: 280px;
+        line-height: 1.5;
+      }
+      
+      .permission-button {
+        background-color: #1DB954;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 24px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      
+      .permission-button:hover {
+        background-color: #1ED760;
+      }
+      
+      @keyframes pulse {
+        0% { transform: scale(1); opacity: 0.8; }
+        50% { transform: scale(1.1); opacity: 1; }
+        100% { transform: scale(1); opacity: 0.8; }
       }
       
       /* Responsive adjustments */
@@ -406,13 +473,14 @@
           renderer="antialias: true; colorManagement: true; precision: high; logarithmicDepthBuffer: true;"
           embedded
           loading-screen="enabled: false"
+          device-orientation-permission-ui="enabled: true"
           inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js"
         >
           <a-assets timeout="30000">
-            <video id="xr-video" preload="auto" crossorigin="anonymous" playsinline loop muted></video>
+            <video id="xr-video" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline loop muted></video>
           </a-assets>
           <a-videosphere src="#xr-video" rotation="0 -90 0" radius="100" segments-height="64" segments-width="64"></a-videosphere>
-          <a-entity camera position="0 1.6 0" look-controls="enabled: true; reverseMouseDrag: false" wasd-controls="enabled: false"></a-entity>
+          <a-entity camera look-controls="magicWindowTrackingEnabled: true; touchEnabled: true; mouseEnabled: true; reverseMouseDrag: false" position="0 1.6 0" wasd-controls="enabled: false"></a-entity>
         </a-scene>
       </div>
 
@@ -439,7 +507,7 @@
             <button id="rewind-btn" class="control-btn rewind-btn" title="Rewind 10 seconds">
               <span class="time-shift-value">-10s</span>
               <svg viewBox="0 0 24 24">
-                <path fill="currentColor" d="M12.5,3C17.15,3 21.08,6.03 22.47,10.22L20.1,11C19.05,7.81 16.04,5.5 12.5,5.5C10.54,5.5 8.77,6.22 7.38,7.38L10,10H3V3L5.6,5.6C7.45,4 9.85,3 12.5,3M10,12V22H8V14H6V12H10M18,14V20C18,21.11 17.11,22 16,22H14A2,2 0 0,1 12,20V14A2,2 0 0,1 14,12H16C17.11,12 18,12.9 18,14M14,14V20H16V14H14Z"/>
+                <path fill="currentColor" d="M12.5,3C17.15,3 21.08,6.03 22.47,10.22L20.1,11C19.05,7.81 16.04,5.5 12.5,5.5C10.54,5.5 8.77,6.22 7.38,7.38L10,10H3V3L5.6,5.6C7.45,4 9.85,3 12.5,3M10,12V22H8V14H6V12H10M18,14V20C18,21.11 17.11,22 16,22H14A2,2 0 0,1 12,20V14A2,2 0 0,1 14,12H16C17.11,12 18,12.9 18,14M14,14V20H16V14H14M11.5,3C14.15,3 16.55,4 18.4,5.6L21,3V10H14L16.62,7.38C15.23,6.22 13.46,5.5 11.5,5.5C7.96,5.5 4.95,7.81 3.9,11L1.53,10.22C2.92,6.03 6.85,3 11.5,3Z"/>
               </svg>
             </button>
             <button id="play-pause-btn" class="control-btn play-pause-btn">
@@ -496,6 +564,20 @@
         <div>Loading immersive experience...</div>
       </div>
       
+      <!-- Custom device orientation permission overlay, primarily for iOS -->
+      <div class="permission-overlay" id="permission-overlay">
+        <div class="permission-icon">
+          <svg viewBox="0 0 24 24" fill="white">
+            <path d="M4,6H20V16H4M20,18A2,2 0 0,0 22,16V6C22,4.89 21.1,4 20,4H4C2.89,4 2,4.89 2,6V16A2,2 0 0,0 4,18H0V20H24V18H20Z" />
+          </svg>
+        </div>
+        <div class="permission-title">Device Motion Required</div>
+        <div class="permission-message">
+          To experience 360° content, we need permission to use your device's motion sensors.
+        </div>
+        <button id="request-permission-btn" class="permission-button">Enable 360° Viewing</button>
+      </div>
+      
       <!-- Debug info panel -->
       <div class="debug-info" id="debug-info"></div>
 
@@ -541,6 +623,57 @@
             }
           }
           
+          // Device detection
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          
+          logDebug(`Device detection: Mobile=${isMobile}, iOS=${isIOS}`);
+          
+          // Handle device orientation permission request (primarily for iOS)
+          function setupDeviceOrientationPermission() {
+            const permissionOverlay = document.getElementById('permission-overlay');
+            const requestPermissionBtn = document.getElementById('request-permission-btn');
+            
+            // Only needed for iOS 13+
+            if (!isIOS) return;
+            
+            logDebug('Setting up iOS device orientation permission handler');
+            
+            // Check if we need permission
+            if (typeof DeviceOrientationEvent !== 'undefined' && 
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+              
+              // Button to request permission
+              requestPermissionBtn.addEventListener('click', () => {
+                logDebug('Permission button clicked');
+                
+                DeviceOrientationEvent.requestPermission()
+                  .then(response => {
+                    if (response === 'granted') {
+                      logDebug('Device orientation permission granted');
+                      permissionOverlay.classList.remove('active');
+                      
+                      // If we have entered XR mode already, reattach look controls
+                      const camera = document.querySelector('a-entity[camera]');
+                      if (camera) {
+                        camera.components['look-controls'].pause();
+                        camera.components['look-controls'].play();
+                        logDebug('Camera look-controls reset after permission');
+                      }
+                    } else {
+                      logDebug(`Permission response: ${response}`);
+                      alert('360° viewing requires motion sensor permission');
+                    }
+                  })
+                  .catch(error => {
+                    logDebug(`Permission error: ${error}`);
+                    alert('Could not access motion sensors. Please try again.');
+                  });
+              });
+            }
+          }
+          
           // Check URL parameters for CMS data and auto-advance setting
           function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -551,6 +684,9 @@
           // Get URL params and check if auto-advance is enabled
           const { autoAdvance } = getUrlParams();
           logDebug(`Auto-advance is ${autoAdvance ? 'enabled' : 'disabled'}`);
+          
+          // Initialize permission handling
+          setupDeviceOrientationPermission();
           
           // Populate initial track (this would normally come from playlist-manager.js)
           const initialTrack = {
@@ -602,6 +738,12 @@
               
               logDebug('Starting video preload: ' + initialTrack.videoSrc);
               
+              // Configure video for mobile
+              video.setAttribute('playsinline', '');
+              video.setAttribute('webkit-playsinline', '');
+              video.setAttribute('crossorigin', 'anonymous');
+              video.crossOrigin = 'anonymous';
+              
               // Listen for both canplaythrough and loadeddata events
               let resolved = false;
               const markAsResolved = () => {
@@ -632,7 +774,15 @@
                     'Unknown video error';
                   logDebug('Error preloading XR video: ' + errorMessage);
                   console.error('Error preloading XR video:', e);
-                  reject(new Error(errorMessage));
+                  
+                  // Try alternative loading method for mobile
+                  if (isMobile) {
+                    tryMobileVideoFallback(video, initialTrack.videoSrc)
+                      .then(() => markAsResolved())
+                      .catch(err => reject(new Error(errorMessage)));
+                  } else {
+                    reject(new Error(errorMessage));
+                  }
                 }
               };
               
@@ -662,31 +812,46 @@
               video.load();
               logDebug('Video load triggered');
               
-              // Try preloading with play/pause, but handle autoplay restrictions gracefully
-              setTimeout(() => {
-                video.play().then(() => {
-                  // Immediately pause after playing to preload
-                  video.pause();
-                  video.currentTime = 0;
-                  logDebug('Video play/pause sequence completed for preloading');
-                }).catch(e => {
-                  logDebug('Auto-play for preloading not allowed: ' + e.message);
-                  console.warn('Auto-play for preloading not allowed:', e);
-                  // This is expected on some browsers, not a critical error
-                  // Check if we have enough data anyway
-                  if (video.readyState >= 3) {
+              // Mobile-specific loading approach
+              if (isMobile) {
+                // On mobile, we won't try playing the video yet, just load
+                // Instead we'll wait for user interaction before trying to play
+                logDebug('Using mobile-optimized loading approach');
+                
+                // Set a timeout to check if loaded to a reasonable level
+                setTimeout(() => {
+                  if (!resolved && video.readyState >= 2) {
+                    logDebug('Mobile video preloaded sufficiently (readyState: ' + video.readyState + ')');
                     markAsResolved();
-                  } else {
-                    // Set a timeout to check video readiness in case events don't fire
-                    setTimeout(() => {
-                      if (!resolved && video.readyState >= 2) {
-                        logDebug('Video preloaded via timeout check (readyState: ' + video.readyState + ')');
-                        markAsResolved();
-                      }
-                    }, 3000);
                   }
-                });
-              }, 500);
+                }, 3000);
+              } else {
+                // Desktop approach - try to preload with play/pause
+                setTimeout(() => {
+                  video.play().then(() => {
+                    // Immediately pause after playing to preload
+                    video.pause();
+                    video.currentTime = 0;
+                    logDebug('Video play/pause sequence completed for preloading');
+                  }).catch(e => {
+                    logDebug('Auto-play for preloading not allowed: ' + e.message);
+                    console.warn('Auto-play for preloading not allowed:', e);
+                    // This is expected on some browsers, not a critical error
+                    // Check if we have enough data anyway
+                    if (video.readyState >= 3) {
+                      markAsResolved();
+                    } else {
+                      // Set a timeout to check video readiness in case events don't fire
+                      setTimeout(() => {
+                        if (!resolved && video.readyState >= 2) {
+                          logDebug('Video preloaded via timeout check (readyState: ' + video.readyState + ')');
+                          markAsResolved();
+                        }
+                      }, 3000);
+                    }
+                  });
+                }, 500);
+              }
               
               // Set a timeout fallback
               setTimeout(() => {
@@ -705,6 +870,326 @@
               }, 10000);
             });
           };
+          
+          // Fallback loading method specifically for mobile devices
+          function tryMobileVideoFallback(videoElement, videoSrc) {
+            return new Promise((resolve, reject) => {
+              logDebug('Trying mobile video fallback loading method');
+              
+              // Create a temporary video element
+              const tempVideo = document.createElement('video');
+              tempVideo.setAttribute('muted', 'true');
+              tempVideo.setAttribute('playsinline', '');
+              tempVideo.setAttribute('webkit-playsinline', '');
+              tempVideo.setAttribute('crossorigin', 'anonymous');
+              tempVideo.muted = true;
+              tempVideo.style.display = 'none';
+              tempVideo.crossOrigin = 'anonymous';
+              document.body.appendChild(tempVideo);
+              
+              // Setup listeners on temp video
+              tempVideo.addEventListener('canplaythrough', () => {
+                logDebug('Temp video loaded successfully');
+                // Transfer to main video
+                videoElement.src = videoSrc;
+                
+                // Clean up
+                document.body.removeChild(tempVideo);
+                resolve();
+              }, { once: true });
+              
+              tempVideo.addEventListener('error', (e) => {
+                logDebug('Temp video also failed to load: ' + (e.message || 'unknown error'));
+                // Clean up
+                document.body.removeChild(tempVideo);
+                reject(new Error('Mobile video fallback failed'));
+              }, { once: true });
+              
+              // Try loading
+              tempVideo.src = videoSrc;
+              tempVideo.load();
+              
+              // Set timeout
+              setTimeout(() => {
+                if (tempVideo.readyState >= 2) {
+                  logDebug('Temp video loaded sufficiently via timeout check');
+                  // Transfer to main video
+                  videoElement.src = videoSrc;
+                  
+                  // Clean up
+                  if (document.body.contains(tempVideo)) {
+                    document.body.removeChild(tempVideo);
+                  }
+                  resolve();
+                } else {
+                  logDebug('Temp video loading timed out');
+                  if (document.body.contains(tempVideo)) {
+                    document.body.removeChild(tempVideo);
+                  }
+                  reject(new Error('Mobile video fallback timed out'));
+                }
+              }, 5000);
+            });
+          }
+          
+          // Enter XR mode button handler
+          function enterXRMode() {
+            console.log('Entering XR mode...');
+            
+            // First check if we need to request device orientation permission (iOS 13+)
+            if (isIOS && typeof DeviceOrientationEvent !== 'undefined' && 
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+              
+              // Check if permission is already granted
+              DeviceOrientationEvent.requestPermission()
+                .then(response => {
+                  if (response === 'granted') {
+                    logDebug('Device orientation permission already granted');
+                    activateXRMode();
+                  } else {
+                    logDebug('Need to request device orientation permission');
+                    // Show the permission overlay
+                    const permissionOverlay = document.getElementById('permission-overlay');
+                    permissionOverlay.classList.add('active');
+                  }
+                })
+                .catch(error => {
+                  // If this fails, likely need user interaction first
+                  logDebug('Error checking permission: ' + error);
+                  
+                  // Show the permission overlay
+                  const permissionOverlay = document.getElementById('permission-overlay');
+                  permissionOverlay.classList.add('active');
+                });
+              
+              return; // Wait for permission response before continuing
+            }
+            
+            // Continue with XR mode activation for non-iOS or iOS with permissions
+            activateXRMode();
+          }
+          
+          // Activate XR mode (called after permissions are checked)
+          function activateXRMode() {
+            logDebug('Activating XR mode...');
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+            
+            // Show loading indicator if available
+            if (loadingOverlay) {
+              loadingOverlay.classList.add('active');
+            }
+            
+            try {
+              // Ensure A-Frame is properly initialized first
+              if (typeof ensureAFrameSceneVisibility === 'function') {
+                logDebug('Ensuring A-Frame scene visibility');
+                ensureAFrameSceneVisibility();
+              }
+              
+              // Make sure video is properly loaded
+              const video = document.querySelector('#xr-video');
+              if (!video) {
+                throw new Error('Video element not found');
+              }
+              
+              let videoReady = false;
+              if (video.readyState >= 3) {
+                videoReady = true;
+                logDebug('Video is already buffered and ready');
+              } else if (video.readyState < 1) {
+                // If video isn't loaded at all, load it now
+                logDebug('Video not loaded, loading source: ' + (video.src || initialTrack.videoSrc));
+                
+                if (!video.src && initialTrack && initialTrack.videoSrc) {
+                  video.src = initialTrack.videoSrc;
+                  video.load();
+                }
+              }
+              
+              // Get DOM elements
+              const xrContainer = document.getElementById('xr-scene-container');
+              const albumArt = document.querySelector('.centered-album-art');
+              const exitXrBtn = document.getElementById('exit-xr');
+              const launchXrBtn = document.getElementById('launch-xr');
+              
+              if (!xrContainer || !albumArt || !exitXrBtn || !launchXrBtn) {
+                throw new Error('Required DOM elements not found');
+              }
+              
+              // First, remove hidden class from body
+              document.body.classList.remove('xr-scene-hidden');
+              logDebug('Removed xr-scene-hidden class from body');
+              
+              // Hide album art
+              albumArt.style.display = 'none';
+              
+              // Update button visibility
+              launchXrBtn.style.display = 'none';
+              exitXrBtn.style.display = 'inline-block';
+              
+              // Show recenter camera button in XR mode
+              const recenterBtn = document.getElementById('recenter-camera-btn');
+              if (recenterBtn) {
+                recenterBtn.style.display = 'inline-block';
+              }
+              
+              // Explicitly make the scene container visible with !important styles inline
+              xrContainer.style.cssText = `
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 9000 !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+              `;
+              logDebug('Applied critical style overrides to XR container');
+              
+              // Ensure video element is properly configured for mobile
+              video.setAttribute('playsinline', '');
+              video.setAttribute('webkit-playsinline', '');
+              video.crossOrigin = 'anonymous';
+              
+              // CRITICAL FIX: Setup audio/video properly for XR mode
+              const audio = document.querySelector('#audio');
+              if (audio) {
+                // Store audio state for later
+                const savedVolume = audio.volume;
+                const wasMuted = audio.muted;
+                
+                audio.dataset.prevVolume = savedVolume;
+                audio.dataset.prevMuted = wasMuted;
+                
+                // Mobile behavior: Keep audio playing but muted, and unmute video
+                if (isMobile) {
+                  audio.muted = true;
+                  video.volume = savedVolume;
+                  video.muted = false;
+                  logDebug('Mobile: Audio muted, video unmuted with volume: ' + video.volume);
+                } else {
+                  // Desktop behavior: Keep audio playing and muted
+                  audio.muted = true;
+                  video.volume = savedVolume; 
+                  video.muted = false;
+                  logDebug('Desktop: Audio muted, video unmuted with volume: ' + video.volume);
+                }
+                
+                // Sync time with audio
+                video.currentTime = audio.currentTime || 0;
+                logDebug('Video time synced with audio: ' + video.currentTime);
+              }
+              
+              // Update UI for mute status
+              const muteBtn = document.getElementById('mute-btn');
+              const volumeIcon = document.querySelector('.volume-icon');
+              const muteIcon = document.querySelector('.mute-icon');
+              
+              if (muteBtn) {
+                if (video.muted) {
+                  muteBtn.classList.add('muted');
+                  if (volumeIcon) volumeIcon.style.display = 'none';
+                  if (muteIcon) muteIcon.style.display = 'block';
+                } else {
+                  muteBtn.classList.remove('muted');
+                  if (volumeIcon) volumeIcon.style.display = 'block';
+                  if (muteIcon) muteIcon.style.display = 'none';
+                }
+              }
+              
+              // Try to play the video
+              try {
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                  playPromise
+                    .then(() => {
+                      logDebug('Video playback started successfully');
+                      
+                      // Make sure to hide loading overlay
+                      if (loadingOverlay) {
+                        loadingOverlay.classList.remove('active');
+                      }
+                      
+                      // Set up sync interval to keep video in sync with audio
+                      const syncInterval = setInterval(() => {
+                        if (Math.abs(video.currentTime - audio.currentTime) > 0.5) {
+                          video.currentTime = audio.currentTime;
+                          logDebug('Re-syncing video time with audio: ' + video.currentTime);
+                        }
+                      }, 5000);
+                      
+                      // Store interval for cleanup
+                      window._xrSyncInterval = syncInterval;
+                    })
+                    .catch(error => {
+                      logDebug('Error starting video playback: ' + error.message);
+                      
+                      // Hide loading overlay
+                      if (loadingOverlay) {
+                        loadingOverlay.classList.remove('active');
+                      }
+                      
+                      // For iOS/Safari, we need user interaction
+                      if (isIOS) {
+                        logDebug('iOS detected, showing touch to play message');
+                        alert('Please tap the screen once to enable 360° video');
+                        
+                        // Add one-time click handler to start playback
+                        const handlePlay = () => {
+                          video.play().catch(e => {
+                            logDebug('Still cannot play video: ' + e.message);
+                          });
+                        };
+                        
+                        document.addEventListener('click', handlePlay, { once: true });
+                      } else {
+                        // For other mobile devices
+                        alert('Please tap the screen to enable 360° video');
+                        
+                        // Add one-time click handler to start playback
+                        const handlePlay = () => {
+                          video.play().catch(e => {
+                            logDebug('Still cannot play video: ' + e.message);
+                          });
+                        };
+                        
+                        document.addEventListener('click', handlePlay, { once: true });
+                      }
+                    });
+                }
+              } catch (e) {
+                logDebug('Exception trying to play video: ' + e.message);
+                
+                // Hide loading overlay
+                if (loadingOverlay) {
+                  loadingOverlay.classList.remove('active');
+                }
+                
+                // Fallback for older browsers - just show a message
+                alert('Please tap the screen to enable 360° video');
+              }
+            } catch (e) {
+              logDebug('Error entering XR mode: ' + e.message);
+              
+              // Hide loading overlay
+              if (loadingOverlay) {
+                loadingOverlay.classList.remove('active');
+              }
+              
+              // Reset UI in case of error
+              document.body.classList.add('xr-scene-hidden');
+              
+              // Show album art again
+              const albumArt = document.querySelector('.centered-album-art');
+              if (albumArt) {
+                albumArt.style.display = 'block';
+              }
+              
+              // Alert user
+              alert('Could not enter 360° mode. Please try again.');
+            }
+          }
           
           // Call this function when entering XR mode to ensure A-Frame scene is visible and working
           function ensureAFrameSceneVisibility() {
@@ -742,9 +1227,19 @@
               `;
               logDebug('Applied critical style overrides to XR container');
               
+              // Make sure any internal A-Frame elements are visible
+              const aframeElements = xrContainer.querySelectorAll('a-scene, .a-canvas');
+              aframeElements.forEach(el => {
+                el.style.cssText = `
+                  display: block !important;
+                  visibility: visible !important;
+                  opacity: 1 !important;
+                `;
+              });
+              
               // Add fallback rendering attempt if videosphere isn't rendering correctly
-              const fallbackVideoSetup = () => {
-                logDebug('Attempting fallback video setup');
+              const setupVideosphere = () => {
+                logDebug('Setting up videosphere');
                 // Get the video element
                 const video = document.getElementById('xr-video');
                 const scene = xrContainer.querySelector('a-scene');
@@ -752,27 +1247,20 @@
                 
                 if (video && videosphere) {
                   // Update video properties
+                  video.setAttribute('playsinline', '');
+                  video.setAttribute('webkit-playsinline', '');
                   video.crossOrigin = 'anonymous';
                   
                   // Reset the videosphere
                   videosphere.removeAttribute('src');
                   
-                  // Force a re-render by removing and reattaching
-                  const parent = videosphere.parentNode;
-                  const temp = videosphere;
-                  parent.removeChild(videosphere);
-                  
-                  // Add it back after a short delay
+                  // Force a re-render by removing and reattaching after a short delay
                   setTimeout(() => {
-                    parent.appendChild(temp);
-                    temp.setAttribute('src', '#xr-video');
-                    logDebug('Videosphere reattached after full reset');
+                    videosphere.setAttribute('src', '#xr-video');
+                    logDebug('Videosphere source reattached');
                   }, 100);
                 }
               };
-              
-              // Schedule a fallback attempt after a short delay
-              setTimeout(fallbackVideoSetup, 500);
               
               // Check if A-Frame scene exists
               const scene = xrContainer.querySelector('a-scene');
@@ -780,6 +1268,16 @@
                 logDebug('A-Frame scene not found');
                 return false;
               }
+              
+              // Make sure the scene is visible and properly styled
+              scene.style.cssText = `
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                width: 100% !important;
+                height: 100% !important;
+                z-index: 9001 !important;
+              `;
               
               // Check if A-Frame is fully initialized
               if (!scene.hasLoaded) {
@@ -806,20 +1304,6 @@
               }
               
               function finishSceneSetup(scene) {
-                // Force visibility of A-Frame scene
-                scene.style.cssText = `
-                  display: block !important;
-                  visibility: visible !important;
-                  opacity: 1 !important;
-                  width: 100% !important;
-                  height: 100% !important;
-                  z-index: 9001 !important;
-                `;
-                
-                // Log scene information for debugging
-                logDebug('Scene loaded state: ' + scene.hasLoaded);
-                logDebug('Scene is active: ' + scene.isPlaying);
-                
                 // Make sure canvas is visible
                 const canvas = scene.canvas;
                 if (canvas) {
@@ -834,11 +1318,7 @@
                     opacity: 1 !important;
                     visibility: visible !important;
                   `;
-                  logDebug('A-Frame canvas styles reset with !important flags');
-                  
-                  // Examine canvas properties
-                  logDebug('Canvas dimensions: ' + canvas.width + 'x' + canvas.height);
-                  logDebug('Canvas visibility: ' + canvas.style.visibility);
+                  logDebug('Canvas styles reset with !important flags');
                 } else {
                   logDebug('A-Frame canvas not found');
                   return false;
@@ -848,59 +1328,48 @@
                 if (scene.renderer) {
                   scene.renderer.setSize(window.innerWidth, window.innerHeight);
                   window.dispatchEvent(new Event('resize'));
-                  if (typeof scene.resize === 'function') {
-                    scene.resize();
-                  }
                   logDebug('A-Frame renderer resized');
-                } else {
-                  logDebug('A-Frame renderer not available');
                 }
                 
                 // Check and enable camera look controls
                 const camera = scene.querySelector('[camera]');
                 if (camera) {
-                  camera.setAttribute('look-controls', 'enabled', true);
-                  logDebug('A-Frame camera controls enabled');
+                  // Set up camera for desktop and mobile
+                  camera.setAttribute('look-controls', {
+                    enabled: true,
+                    touchEnabled: true,
+                    magicWindowTrackingEnabled: true,
+                    mouseEnabled: true,
+                    reverseMouseDrag: false
+                  });
+                  logDebug('Camera look-controls enabled with mobile support');
+                  
+                  // If orientation permissions are needed for iOS, we need to handle look-controls specially
+                  if (isIOS && typeof DeviceOrientationEvent !== 'undefined' && 
+                      typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    
+                    // Reset look controls after a delay to ensure they pick up permissions
+                    setTimeout(() => {
+                      if (camera.components && camera.components['look-controls']) {
+                        camera.components['look-controls'].pause();
+                        camera.components['look-controls'].play();
+                        logDebug('Camera look-controls reset for iOS permission handling');
+                      }
+                    }, 1000);
+                  }
                 } else {
                   logDebug('A-Frame camera not found');
                   return false;
                 }
                 
-                // Make sure video is properly attached to videosphere
-                const videosphere = scene.querySelector('a-videosphere');
-                if (videosphere) {
-                  const video = document.querySelector('#xr-video');
-                  if (video) {
-                    // Force re-attach the video
-                    videosphere.removeAttribute('src');
-                    setTimeout(() => {
-                      videosphere.setAttribute('src', '#xr-video');
-                      logDebug('Reattached video to videosphere');
-                      
-                      // Check videosphere material
-                      const material = videosphere.getObject3D('mesh').material;
-                      if (material) {
-                        logDebug('Videosphere material exists');
-                        if (material.map) {
-                          logDebug('Videosphere has texture map');
-                        } else {
-                          logDebug('Videosphere missing texture map');
-                        }
-                      } else {
-                        logDebug('Videosphere missing material');
-                      }
-                    }, 100);
-                  }
-                } else {
-                  logDebug('A-Frame videosphere not found');
-                  return false;
-                }
+                // Set up videosphere
+                setupVideosphere();
                 
-                // Force redraw
+                // Force a redraw after a short delay
                 setTimeout(() => {
                   window.dispatchEvent(new Event('resize'));
                   logDebug('Forced window resize event for A-Frame');
-                }, 50);
+                }, 100);
                 
                 return true;
               }
@@ -909,639 +1378,6 @@
               console.error('Error showing A-Frame scene:', e);
               return false;
             }
-          }
-          
-          // Initialize the player (this would be handled by player-core.js in the full version)
-          if (typeof PlayerCore !== 'undefined') {
-            // Preload the XR content before initializing
-            logDebug('Starting preload with PlayerCore available');
-            preloadXRContent()
-              .then(() => {
-                PlayerCore.init(initialTrack);
-                if (loadingOverlay) {
-                  loadingOverlay.classList.remove('active');
-                }
-                logDebug('PlayerCore initialized');
-                
-                // Initialize recenter camera functionality
-                if (typeof addRecenterCameraHandler === 'function') {
-                  setTimeout(addRecenterCameraHandler, 500);
-                  logDebug('Added recenter camera handler');
-                }
-              })
-              .catch(error => {
-                logDebug('Error during preload: ' + error.message);
-                console.error('Error during preload:', error);
-                if (loadingOverlay) {
-                  loadingOverlay.classList.remove('active');
-                }
-                PlayerCore.init(initialTrack); // Still initialize even if preload fails
-                
-                // Initialize recenter camera functionality even after error
-                if (typeof addRecenterCameraHandler === 'function') {
-                  setTimeout(addRecenterCameraHandler, 500);
-                  logDebug('Added recenter camera handler after preload error');
-                }
-              });
-          } else {
-            // Fallback for when external scripts aren't available
-            logDebug('PlayerCore not available, using fallback');
-            const video = document.querySelector('#xr-video');
-            const audio = document.querySelector('#audio');
-            const audioSrc = document.querySelector('#audio-src');
-            
-            // Set audio source
-            audioSrc.src = initialTrack.audioSrc;
-            audio.load();
-            logDebug('Audio source set: ' + initialTrack.audioSrc);
-            
-            // Preload the XR video
-            preloadXRContent()
-              .then(() => {
-                if (loadingOverlay) {
-                  loadingOverlay.classList.remove('active');
-                }
-                logDebug('XR content preloaded successfully');
-              })
-              .catch(error => {
-                logDebug('Error during manual preload: ' + error.message);
-                console.error('Error during manual preload:', error);
-                // Still set the video source as fallback
-                video.src = initialTrack.videoSrc;
-                video.load();
-                if (loadingOverlay) {
-                  loadingOverlay.classList.remove('active');
-                }
-              })
-              .finally(() => {
-                // Update UI regardless of preload success
-                document.querySelector('#track-name').textContent = initialTrack.title;
-                document.querySelector('#chapter-name').textContent = initialTrack.chapter;
-                document.querySelector('#album-art').src = initialTrack.albumArt;
-                
-                // Setup basic XR mode functionality if scripts are missing
-                setupBasicXRMode();
-                logDebug('Basic XR mode setup complete');
-              });
-              
-            // Setup basic XR mode functionality if scripts are missing
-            function setupBasicXRMode() {
-              const launchXrBtn = document.getElementById('launch-xr');
-              const exitXrBtn = document.getElementById('exit-xr');
-              const xrContainer = document.getElementById('xr-scene-container');
-              const albumArt = document.querySelector('.centered-album-art');
-              const controlsContainer = document.querySelector('.audio-controls');
-              const video = document.querySelector('#xr-video');
-              
-              // Initialize button state - disabled by default until video loads
-              if (launchXrBtn) {
-                launchXrBtn.disabled = true;
-                launchXrBtn.textContent = 'Loading XR Content...';
-              }
-              
-              if (launchXrBtn && exitXrBtn && xrContainer && albumArt) {
-                // Check video readiness and update button state
-                const updateButtonState = () => {
-                  if (video && video.readyState >= 3) { // HAVE_FUTURE_DATA = 3
-                    launchXrBtn.disabled = false;
-                    launchXrBtn.textContent = 'Launch XR Mode';
-                    logDebug('XR button enabled - video is ready (readyState: ' + video.readyState + ')');
-                  } else if (video) {
-                    launchXrBtn.disabled = true;
-                    launchXrBtn.textContent = 'Loading XR Content...';
-                    logDebug('XR button disabled - video not ready (readyState: ' + (video ? video.readyState : 'no video') + ')');
-                  }
-                };
-                
-                // Set up event listeners for video loading
-                if (video) {
-                  // Check if already loaded
-                  updateButtonState();
-                  
-                  // Listen for loading events
-                  video.addEventListener('canplaythrough', () => {
-                    logDebug('Video canplaythrough event fired');
-                    updateButtonState();
-                  }, { once: true });
-                  
-                  video.addEventListener('loadeddata', () => {
-                    logDebug('Video loadeddata event fired');
-                    updateButtonState();
-                  }, { once: true });
-                }
-                
-                launchXrBtn.addEventListener('click', async () => {
-                  // Skip if button is disabled
-                  if (launchXrBtn.disabled) {
-                    logDebug('Ignoring click on disabled XR button');
-                    return;
-                  }
-                  
-                  logDebug('Launch XR button clicked');
-                  document.body.style.overflow = 'hidden'; // Prevent scrolling
-                  
-                  // Show loading indicator if available
-                  if (loadingOverlay) {
-                    loadingOverlay.classList.add('active');
-                  }
-                  
-                  try {
-                    // Ensure A-Frame is properly initialized first
-                    if (typeof initializeAFrameScene === 'function') {
-                      logDebug('Ensuring A-Frame is initialized');
-                      initializeAFrameScene();
-                    }
-                    
-                    // Make sure video is properly loaded
-                    let videoReady = false;
-                    if (video.readyState >= 3) {
-                      videoReady = true;
-                    } else {
-                      // Try to load the video first
-                      logDebug('Video not ready, attempting to load');
-                      
-                      try {
-                        if (!video.src && initialTrack && initialTrack.videoSrc) {
-                          video.src = initialTrack.videoSrc;
-                        }
-                        
-                        if (!video.src) {
-                          throw new Error('No video source available');
-                        }
-                        
-                        // Wait for video to be ready
-                        await new Promise((resolve, reject) => {
-                          const videoLoadTimeout = setTimeout(() => {
-                            logDebug('Video load timed out, continuing anyway');
-                            resolve();
-                          }, 5000);
-                          
-                          video.addEventListener('canplaythrough', () => {
-                            clearTimeout(videoLoadTimeout);
-                            logDebug('Video canplaythrough event fired');
-                            videoReady = true;
-                            resolve();
-                          }, { once: true });
-                          
-                          video.addEventListener('error', (e) => {
-                            clearTimeout(videoLoadTimeout);
-                            logDebug('Video loading error: ' + (video.error ? video.error.message : 'unknown'));
-                            reject(new Error('Video loading failed'));
-                          }, { once: true });
-                          
-                          // Force video loading
-                          video.load();
-                        });
-                      } catch (videoError) {
-                        logDebug('Error loading video: ' + videoError.message);
-                        // Continue anyway - user experience is better than showing an error
-                      }
-                    }
-                    
-                    // First, remove hidden class from body
-                    document.body.classList.remove('xr-scene-hidden');
-                    logDebug('Removed xr-scene-hidden class from body');
-                    
-                    // Hide album art
-                    albumArt.style.display = 'none';
-                    
-                    // Explicitly make the scene container visible with !important styles inline
-                    xrContainer.style.cssText = `
-                      display: block !important;
-                      visibility: visible !important;
-                      opacity: 1 !important;
-                      z-index: 9000 !important;
-                      position: fixed !important;
-                      top: 0 !important;
-                      left: 0 !important;
-                      width: 100vw !important;
-                      height: 100vh !important;
-                    `;
-                    logDebug('Applied critical style overrides to XR container');
-                    
-                    // Make sure any internal A-Frame elements are visible
-                    const aframeElements = xrContainer.querySelectorAll('a-scene, .a-canvas');
-                    aframeElements.forEach(el => {
-                      el.style.cssText = `
-                        display: block !important;
-                        visibility: visible !important;
-                        opacity: 1 !important;
-                      `;
-                    });
-                    logDebug('Applied critical style overrides to A-Frame elements');
-                    
-                    // Explicitly handle A-Frame scene
-                    const scene = xrContainer.querySelector('a-scene');
-                    if (scene) {
-                      // Force scene visibility
-                      scene.style.cssText = `
-                        display: block !important;
-                        visibility: visible !important;
-                        opacity: 1 !important;
-                        width: 100% !important;
-                        height: 100% !important;
-                        z-index: 9001 !important;
-                      `;
-                      
-                      // Make sure canvas is visible
-                      const canvas = scene.canvas;
-                      if (canvas) {
-                        canvas.style.cssText = `
-                          display: block !important;
-                          width: 100% !important;
-                          height: 100% !important;
-                          position: absolute !important;
-                          top: 0 !important;
-                          left: 0 !important;
-                          z-index: 9901 !important;
-                          opacity: 1 !important;
-                          visibility: visible !important;
-                        `;
-                      }
-                      
-                      // Force scene to resize if renderer exists
-                      if (scene.renderer) {
-                        scene.renderer.setSize(window.innerWidth, window.innerHeight);
-                      }
-                      
-                      // Check and enable camera look controls
-                      const camera = scene.querySelector('[camera]');
-                      if (camera) {
-                        camera.setAttribute('look-controls', 'enabled: true; reverseMouseDrag: false');
-                      }
-                      
-                      // Make sure video is properly attached to videosphere
-                      const videosphere = scene.querySelector('a-videosphere');
-                      if (videosphere && video) {
-                        // Force re-attach the video
-                        videosphere.removeAttribute('src');
-                        setTimeout(() => {
-                          videosphere.setAttribute('src', '#xr-video');
-                          logDebug('Reattached video to videosphere');
-                        }, 50);
-                      }
-                    }
-                    
-                    // Update button visibility - hide XR launch button and show exit button
-                    launchXrBtn.style.display = 'none';
-                    exitXrBtn.style.display = 'inline-block';
-                    
-                    // Show recenter camera button in XR mode
-                    const recenterBtn = document.getElementById('recenter-camera-btn');
-                    if (recenterBtn) {
-                      recenterBtn.style.display = 'inline-block';
-                      // Call recenter handler if it exists
-                      if (typeof addRecenterCameraHandler === 'function') {
-                        setTimeout(addRecenterCameraHandler, 100);
-                      }
-                    }
-                    
-                    // Implement master mute - mute audio and use video for sound
-                    const savedVolume = audio.volume;
-                    const wasMuted = audio.muted;
-                    
-                    // Store audio state for later
-                    audio.dataset.prevVolume = savedVolume;
-                    audio.dataset.prevMuted = wasMuted;
-                    
-                    // CRITICAL FIX: Always mute audio and unmute video in XR mode
-                    audio.muted = true;
-                    logDebug('Forced audio element to mute for XR mode');
-                    
-                    // Update mute button UI to show unmuted state in XR mode (since video will be unmuted)
-                    const muteBtn = document.getElementById('mute-btn');
-                    const volumeIcon = document.querySelector('.volume-icon');
-                    const muteIcon = document.querySelector('.mute-icon');
-                    
-                    if (muteBtn) {
-                      // Always show unmuted state when entering XR mode (since video is unmuted)
-                      muteBtn.classList.remove('muted');
-                      if (volumeIcon) volumeIcon.style.display = 'block';
-                      if (muteIcon) muteIcon.style.display = 'none';
-                      logDebug('Updated mute button UI to show unmuted state for XR mode');
-                    }
-                    
-                    // Force redraw page after short delay to ensure everything is rendered correctly
-                    setTimeout(() => {
-                      window.dispatchEvent(new Event('resize'));
-                      logDebug('Forced window resize event');
-                      
-                      // Final check of element visibility
-                      const computedStyle = window.getComputedStyle(xrContainer);
-                      logDebug('VISIBILITY CHECK: XR container display = ' + computedStyle.display);
-                      logDebug('VISIBILITY CHECK: XR container visibility = ' + computedStyle.visibility);
-                      logDebug('VISIBILITY CHECK: XR container opacity = ' + computedStyle.opacity);
-                      logDebug('VISIBILITY CHECK: XR container z-index = ' + computedStyle.zIndex);
-                      
-                      // If still not visible, try one more force
-                      if (computedStyle.display !== 'block' || computedStyle.visibility !== 'visible') {
-                        logDebug('CRITICAL: Forcing visibility one more time');
-                        xrContainer.style.cssText = `
-                          display: block !important;
-                          visibility: visible !important;
-                          opacity: 1 !important;
-                          z-index: 9000 !important;
-                          position: fixed !important;
-                          top: 0 !important;
-                          left: 0 !important;
-                          width: 100vw !important;
-                          height: 100vh !important;
-                        `;
-                        
-                        // Check if the scene has a canvas and ensure it's visible
-                        const scene = xrContainer.querySelector('a-scene');
-                        if (scene && scene.canvas) {
-                          scene.canvas.style.cssText = `
-                            display: block !important;
-                            visibility: visible !important;
-                            opacity: 1 !important;
-                            z-index: 9001 !important;
-                            position: absolute !important;
-                            width: 100% !important;
-                            height: 100% !important;
-                          `;
-                          logDebug('Applied emergency visibility fix to canvas');
-                        }
-                      }
-                    }, 100);
-                    
-                    // Ensure video is ready to play
-                    const video = document.querySelector('#xr-video');
-                    
-                    // Set video properties - CRITICAL FIX: Always ensure video is unmuted in XR mode
-                    video.volume = savedVolume;
-                    video.muted = false; // Force video to be unmuted in XR mode regardless of previous state
-                    video.currentTime = audio.currentTime || 0;
-                    logDebug('Set video properties: volume=' + video.volume + ', muted=' + video.muted + ', time=' + video.currentTime);
-                    
-                    // Start video playback
-                    try {
-                      await video.play();
-                      logDebug('Video playback started successfully');
-                      
-                      // Make sure to hide loading overlay
-                      if (loadingOverlay) {
-                        loadingOverlay.classList.remove('active');
-                        // Force with inline style as a backup
-                        loadingOverlay.style.opacity = '0';
-                        loadingOverlay.style.pointerEvents = 'none';
-                        setTimeout(() => {
-                          // Re-enable after delay to prevent getting stuck
-                          loadingOverlay.style.removeProperty('opacity');
-                          loadingOverlay.style.removeProperty('pointer-events');
-                        }, 1000);
-                      }
-                    } catch (e) {
-                      logDebug('Error starting video: ' + e.message);
-                      // Try again after user interaction
-                      alert('Please tap the screen to enable 360° video playback');
-                      
-                      // Make sure to hide loading overlay
-                      if (loadingOverlay) {
-                        loadingOverlay.classList.remove('active');
-                      }
-                      
-                      const resumeVideo = () => {
-                        video.play().catch(e => {
-                          logDebug('Still cannot play video: ' + e.message);
-                        });
-                        document.removeEventListener('click', resumeVideo);
-                      };
-                      document.addEventListener('click', resumeVideo, { once: true });
-                    }
-                    
-                    // Set up sync interval to keep video in sync with audio
-                    const syncInterval = setInterval(() => {
-                      if (Math.abs(video.currentTime - audio.currentTime) > 0.5) {
-                        video.currentTime = audio.currentTime;
-                        logDebug('Re-syncing video time with audio: ' + video.currentTime);
-                      }
-                    }, 5000);
-                    
-                    // Store for cleanup
-                    window._xrSyncInterval = syncInterval;
-                    
-                  } catch (e) {
-                    logDebug('Error entering XR mode: ' + e.message);
-                    console.error('Error entering XR mode:', e);
-                    
-                    // Reset UI in case of error
-                    albumArt.style.display = 'block';
-                    document.body.classList.add('xr-scene-hidden');
-                    
-                    // Show error to user
-                    alert('There was a problem entering XR mode: ' + e.message);
-                  } finally {
-                    // Hide loading indicator
-                    if (loadingOverlay) {
-                      loadingOverlay.classList.remove('active');
-                    }
-                  }
-                });
-                
-                exitXrBtn.addEventListener('click', () => {
-                  logDebug('Exit XR button clicked');
-                  
-                  // Clear sync interval if it exists
-                  if (window._xrSyncInterval) {
-                    clearInterval(window._xrSyncInterval);
-                    window._xrSyncInterval = null;
-                  }
-                  
-                  // Immediately add the hidden class to body
-                  document.body.classList.add('xr-scene-hidden');
-                  logDebug('Added xr-scene-hidden class to body');
-                  
-                  // Immediately hide the scene container first
-                  xrContainer.style.visibility = 'hidden';
-                  xrContainer.style.display = 'none';
-                  
-                  // Hide XR container with transition
-                  xrContainer.style.opacity = '0';
-                  
-                  // Explicitly hide all A-Frame components
-                  const scene = xrContainer.querySelector('a-scene');
-                  if (scene) {
-                    // Hide the scene itself
-                    scene.style.display = 'none';
-                    scene.style.visibility = 'hidden';
-                    
-                    // Hide the canvas
-                    if (scene.canvas) {
-                      scene.canvas.style.display = 'none';
-                      scene.canvas.style.visibility = 'hidden';
-                    }
-                    
-                    const videosphere = scene.querySelector('a-videosphere');
-                    if (videosphere) {
-                      // Remove source to free up resources
-                      videosphere.removeAttribute('src');
-                      logDebug('Removed video source from videosphere');
-                    }
-                  }
-                  
-                  // Restore audio state when returning to audio-only mode
-                  const video = document.querySelector('#xr-video');
-                  if (video) {
-                    // Get volume from previous state
-                    if (audio.dataset.prevVolume) {
-                      audio.volume = parseFloat(audio.dataset.prevVolume);
-                    }
-                    
-                    // CRITICAL FIX: Always unmute audio when returning to audio-only mode
-                    audio.muted = false;
-                    logDebug('Restored audio state with forced unmute: volume=' + audio.volume + ', muted=' + audio.muted);
-                    
-                    // Update mute button UI to show unmuted state
-                    const muteBtn = document.getElementById('mute-btn');
-                    const volumeIcon = document.querySelector('.volume-icon');
-                    const muteIcon = document.querySelector('.mute-icon');
-                    
-                    if (muteBtn) {
-                      // Always show unmuted state when returning to audio mode
-                      muteBtn.classList.remove('muted');
-                      if (volumeIcon) volumeIcon.style.display = 'block';
-                      if (muteIcon) muteIcon.style.display = 'none';
-                    }
-                    
-                    // Mute and stop video
-                    video.muted = true;
-                    if (!video.paused) {
-                      video.pause();
-                      logDebug('Video paused on XR exit');
-                    }
-                    
-                    // Remove video source to ensure it's fully unloaded
-                    const videoSrc = video.src;
-                    video.removeAttribute('src');
-                    video.load();
-                    logDebug('Video source removed to free up resources');
-                    
-                    // Store the source for later if needed
-                    video.dataset.lastSrc = videoSrc;
-                  }
-                  
-                  // Show album art again with fade-in
-                  albumArt.style.opacity = '0';
-                  albumArt.style.display = 'block';
-                  setTimeout(() => {
-                    albumArt.style.opacity = '1';
-                    albumArt.style.transition = 'opacity 0.3s ease';
-                  }, 50);
-                  
-                  // Also ensure any XR-specific UI elements are hidden
-                  const recenterBtn = document.getElementById('recenter-camera-btn');
-                  if (recenterBtn) {
-                    recenterBtn.style.display = 'none';
-                  }
-                  
-                  // Update button visibility - show XR launch button and hide exit button
-                  launchXrBtn.style.display = 'inline-block';
-                  exitXrBtn.style.display = 'none';
-                  
-                  // Force redraw the page to ensure everything is properly rendered
-                  window.dispatchEvent(new Event('resize'));
-                  logDebug('Audio-only view restored');
-                });
-                
-                // Setup playback controls sync for XR mode
-                if (controlsContainer) {
-                  const playPauseBtn = document.getElementById('play-pause-btn');
-                  if (playPauseBtn) {
-                    playPauseBtn.addEventListener('click', () => {
-                      const video = document.querySelector('#xr-video');
-                      // Audio control happens elsewhere, just sync video
-                      if (exitXrBtn.style.display !== 'none') { // XR mode is active
-                        if (audio.paused && !video.paused) {
-                          video.pause();
-                          logDebug('Video paused via play/pause button');
-                        } else if (!audio.paused && video.paused) {
-                          video.play().catch(e => {
-                            logDebug('Cannot play video via button: ' + e.message);
-                          });
-                        }
-                      }
-                    });
-                  }
-                  
-                  // Add dedicated mute button handler for XR mode
-                  const muteBtn = document.getElementById('mute-btn');
-                  if (muteBtn) {
-                    muteBtn.addEventListener('click', () => {
-                      const video = document.querySelector('#xr-video');
-                      if (exitXrBtn.style.display !== 'none') { // XR mode is active
-                        // Toggle video mute state in XR mode, keep audio muted
-                        video.muted = !video.muted;
-                        audio.muted = true; // Ensure audio remains muted in XR mode
-                        
-                        // Update UI
-                        const volumeIcon = document.querySelector('.volume-icon');
-                        const muteIcon = document.querySelector('.mute-icon');
-                        
-                        if (video.muted) {
-                          muteBtn.classList.add('muted');
-                          volumeIcon.style.display = 'none';
-                          muteIcon.style.display = 'block';
-                        } else {
-                          muteBtn.classList.remove('muted');
-                          volumeIcon.style.display = 'block';
-                          muteIcon.style.display = 'none';
-                        }
-                        
-                        logDebug('Video mute toggled in XR mode: ' + video.muted);
-                      } else { // Audio-only mode
-                        // Toggle audio mute state in audio-only mode, keep video muted
-                        audio.muted = !audio.muted;
-                        video.muted = true; // Ensure video remains muted in audio-only mode
-                        
-                        // Update UI
-                        const volumeIcon = document.querySelector('.volume-icon');
-                        const muteIcon = document.querySelector('.mute-icon');
-                        
-                        if (audio.muted) {
-                          muteBtn.classList.add('muted');
-                          volumeIcon.style.display = 'none';
-                          muteIcon.style.display = 'block';
-                        } else {
-                          muteBtn.classList.remove('muted');
-                          volumeIcon.style.display = 'block';
-                          muteIcon.style.display = 'none';
-                        }
-                        
-                        logDebug('Audio mute toggled in audio-only mode: ' + audio.muted);
-                      }
-                    });
-                  }
-                }
-                
-                // Start video preload feedback (this is now handled by the updateButtonState function above)
-                updateButtonState();
-                
-                // Set a timeout to check video state periodically in case events don't fire
-                const checkInterval = setInterval(() => {
-                  if (video && video.readyState >= 3) {
-                    updateButtonState();
-                    clearInterval(checkInterval);
-                  }
-                }, 1000);
-                
-                // Safety timeout to clear the interval
-                setTimeout(() => {
-                  clearInterval(checkInterval);
-                  // Force enable button after timeout even if video not fully loaded
-                  if (launchXrBtn.disabled) {
-                    launchXrBtn.disabled = false;
-                    launchXrBtn.textContent = 'Launch XR Mode';
-                    logDebug('XR button enabled by safety timeout');
-                  }
-                }, 15000);
-              } else {
-                logDebug('Missing required DOM elements for XR mode');
-              }
-            }
-            
-            // Alert user that external scripts are missing
-            console.warn('External player scripts not found. Using basic functionality.');
           }
         });
       </script>
@@ -1934,17 +1770,51 @@
           });
         }
         
-        // Enable A-Frame scene camera look controls if needed
-        setTimeout(function() {
-          const scene = document.querySelector('a-scene');
-          if (scene) {
-            const camera = scene.querySelector('[camera]');
-            if (camera) {
-              camera.setAttribute('look-controls', 'enabled: true; reverseMouseDrag: false');
-              console.log('Failsafe camera look-controls enabled');
-            }
+        // Mobile device specific optimizations
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        
+        if (isMobile) {
+          console.log('Mobile device detected, applying optimizations');
+          
+          // Make sure video has proper attributes for mobile
+          const videoElement = document.getElementById('xr-video');
+          if (videoElement) {
+            videoElement.setAttribute('playsinline', '');
+            videoElement.setAttribute('webkit-playsinline', '');
+            videoElement.setAttribute('crossorigin', 'anonymous');
+            videoElement.crossOrigin = 'anonymous';
+            console.log('Mobile video attributes set');
           }
-        }, 1000);
+          
+          // Handle iOS device orientation permission
+          if (isIOS && typeof DeviceOrientationEvent !== 'undefined' && 
+              typeof DeviceOrientationEvent.requestPermission === 'function') {
+            
+            console.log('iOS device orientation permissions may be needed');
+            
+            // Add a global click handler to request permission on first user interaction
+            document.addEventListener('click', function() {
+              DeviceOrientationEvent.requestPermission()
+                .then(response => {
+                  console.log('Device orientation permission response:', response);
+                  if (response === 'granted') {
+                    // Refresh A-Frame camera to pick up permissions
+                    const camera = document.querySelector('a-entity[camera]');
+                    if (camera && camera.components && camera.components['look-controls']) {
+                      camera.components['look-controls'].pause();
+                      camera.components['look-controls'].play();
+                      console.log('Camera look-controls reset after iOS permission granted');
+                    }
+                  }
+                })
+                .catch(error => {
+                  console.warn('Could not request device orientation permission yet:', error);
+                });
+            }, { once: true });
+          }
+        }
       });
     </script>
   </body>
