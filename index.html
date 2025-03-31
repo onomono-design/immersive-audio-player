@@ -169,7 +169,7 @@
       }
       
       /* Debug info */
-      .debug-info {
+      .debug-info { display: none !important;
         position: fixed;
         bottom: 15px;
         left: 15px;
@@ -497,7 +497,7 @@
       </div>
       
       <!-- Debug info panel -->
-      <div class="debug-info" id="debug-info"></div>
+      <div class="debug-info" id="debug-info" style="display:none;"></div>
 
       <!-- External JS - Import in this order -->
       <script src="shared-state.js"></script>
@@ -523,7 +523,7 @@
           }, { passive: false });
           
           // Enable debug mode for troubleshooting
-          const DEBUG = true;
+          const DEBUG = false;
           const debugInfo = document.getElementById('debug-info');
           
           // Helper function to log debug info
