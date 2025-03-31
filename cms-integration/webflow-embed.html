@@ -1,0 +1,194 @@
+<!-- Immersive Audio Player Webflow Integration -->
+<!-- Add this HTML embed code to your Webflow CMS item template -->
+
+<style>
+  .immersive-player-container {
+    width: 100%;
+    height: 600px; /* Adjust height as needed */
+    position: relative;
+    overflow: hidden;
+    margin: 20px 0;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+  
+  .immersive-player-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+  
+  /* Loading state */
+  .immersive-player-container.loading:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .immersive-player-container.loading:after {
+    content: 'Loading player...';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 18px;
+    z-index: 3;
+  }
+</style>
+
+<div class="immersive-player-container loading" id="immersive-player-container">
+  <iframe 
+    id="immersive-player-iframe"
+    class="immersive-player-iframe"
+    src="https://mediaplayer-tau.vercel.app" 
+    allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
+    loading="lazy">
+  </iframe>
+</div>
+
+<script>
+  // Wait for DOM to be ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // Function to send CMS data to the player iframe
+    function sendCmsDataToPlayer() {
+      try {
+        // Get the iframe element
+        const playerIframe = document.getElementById('immersive-player-iframe');
+        const playerContainer = document.getElementById('immersive-player-container');
+        
+        if (!playerIframe || !playerIframe.contentWindow) {
+          console.error('Player iframe not found or not accessible');
+          return;
+        }
+        
+        // Get CMS data from Webflow
+        // This uses the Webflow.js API which is available on published Webflow sites
+        if (!window.Webflow || !window.Webflow.data || !window.Webflow.data.item) {
+          console.warn('Webflow CMS data not available');
+          removeLoadingState();
+          return;
+        }
+        
+        // Get the current CMS item data
+        const cmsItem = window.Webflow.data.item;
+        console.log('CMS item data:', cmsItem);
+        
+        // Get navigation links for previous/next tracks
+        let previousTrackLink = '';
+        let nextTrackLink = '';
+        
+        // Try to find previous/next links from the page
+        // This assumes you have elements with these IDs that contain links
+        const prevLinkElement = document.getElementById('prev-track-link');
+        const nextLinkElement = document.getElementById('next-track-link');
+        
+        if (prevLinkElement && prevLinkElement.href) {
+          previousTrackLink = prevLinkElement.href;
+        }
+        
+        if (nextLinkElement && nextLinkElement.href) {
+          nextTrackLink = nextLinkElement.href;
+        }
+        
+        // Create the data object to send to the iframe
+        const playerData = {
+          type: 'cmsData',
+          content: {
+            id: cmsItem._id,
+            name: cmsItem.name,
+            title: cmsItem.name,
+            
+            // These fields should match your CMS collection fields
+            // Adjust these field names to match your actual CMS structure
+            chapterTitle: cmsItem.chapterTitle,
+            audioSrc: cmsItem.audioUrl || cmsItem.audio_src,
+            videoSrc: cmsItem.xrUrl || cmsItem.videoUrl || cmsItem.XR_src,
+            albumArt: cmsItem.albumArtUrl || cmsItem.coverImage?.url,
+            trackOrder: cmsItem.trackNumber || cmsItem.trackOrder,
+            isXR: !!cmsItem.isXR || !!cmsItem.xrUrl || !!cmsItem.XR_src,
+            
+            // Navigation links
+            previousTrackLink: previousTrackLink,
+            nextTrackLink: nextTrackLink,
+            
+            // Include collection ID for playlist functionality
+            collection_id: cmsItem.collection_id
+          }
+        };
+        
+        // Listen for messages from the iframe
+        window.addEventListener('message', function messageHandler(event) {
+          // Check if message is from our iframe
+          if (event.source !== playerIframe.contentWindow) {
+            return;
+          }
+          
+          console.log('Received message from player:', event.data);
+          
+          // Check if player is ready
+          if (event.data.type === 'playerReady' && event.data.status === 'ready') {
+            // Send CMS data to the player
+            console.log('Player is ready, sending data:', playerData);
+            playerIframe.contentWindow.postMessage(playerData, '*');
+          }
+          
+          // Check if player successfully received data
+          if (event.data.type === 'playerReady' && event.data.status === 'success') {
+            console.log('Player successfully processed CMS data');
+            removeLoadingState();
+            // Remove this listener after successful communication
+            window.removeEventListener('message', messageHandler);
+          }
+        });
+        
+        // Safety timeout to remove loading state
+        setTimeout(removeLoadingState, 5000);
+        
+        // Send initial message to check if iframe is already loaded
+        if (playerIframe.contentWindow) {
+          console.log('Attempting initial message to iframe');
+          playerIframe.contentWindow.postMessage({ type: 'ping' }, '*');
+        }
+      } catch (error) {
+        console.error('Error sending CMS data to player:', error);
+        removeLoadingState();
+      }
+    }
+    
+    // Remove loading state
+    function removeLoadingState() {
+      const playerContainer = document.getElementById('immersive-player-container');
+      if (playerContainer) {
+        playerContainer.classList.remove('loading');
+      }
+    }
+    
+    // Wait for Webflow to initialize
+    if (window.Webflow) {
+      window.Webflow.push(function() {
+        // Set a small timeout to ensure everything is loaded
+        setTimeout(sendCmsDataToPlayer, 500);
+      });
+    } else {
+      // If Webflow object isn't available, still try after a delay
+      setTimeout(sendCmsDataToPlayer, 1000);
+    }
+    
+    // Add event listener for iframe loaded
+    document.getElementById('immersive-player-iframe').addEventListener('load', function() {
+      console.log('Player iframe loaded');
+      // Wait a moment to ensure iframe content is fully initialized
+      setTimeout(sendCmsDataToPlayer, 500);
+    });
+  });
+</script> 
